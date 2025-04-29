@@ -44,7 +44,11 @@ export function TranscriptionApp({ user }: TranscriptionAppProps) {
 
           <StartForm onStart={handleStart} isCollapsed={!!activeMeetingId} />
 
-          <TranscriptionDisplay meetingId={activeMeetingId} onStop={handleStop} />
+          <TranscriptionDisplay 
+            meetingId={activeMeetingId} 
+            onStop={handleStop} 
+            isLive={true} 
+          />
         </CardContent>
       </Card>
     </div>

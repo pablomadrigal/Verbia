@@ -71,7 +71,9 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
       setError(null)
       setExistingBotInfo(null)
 
+      console.log("Starting transcription for meeting URL:", meetingUrl);
       const result = await startTranscription(meetingUrl, language, botName)
+      console.log("Transcription started successfully, meetingId:", result.meetingId);
 
       if (result.success) {
         onStart(result.meetingId)

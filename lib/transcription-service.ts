@@ -17,6 +17,50 @@ export interface TranscriptionData {
   lastUpdated: string
 }
 
+export interface Meeting {
+  id: string
+  platformId: string
+  nativeMeetingId: string
+  platform: string
+  status: "active" | "stopped" | "error"
+  startTime: string
+  endTime?: string
+  title?: string
+}
+
+// Mock data for meeting history
+const mockMeetings: Meeting[] = [
+  {
+    id: "mock-meeting-1",
+    platformId: "google_meet",
+    nativeMeetingId: "abc-defg-hij",
+    platform: "google_meet",
+    status: "stopped",
+    startTime: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    endTime: new Date(Date.now() - 83000000).toISOString(),
+    title: "Product Team Standup"
+  },
+  {
+    id: "mock-meeting-2",
+    platformId: "google_meet",
+    nativeMeetingId: "xyz-uvwt-rst",
+    platform: "google_meet",
+    status: "stopped",
+    startTime: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+    endTime: new Date(Date.now() - 169200000).toISOString(),
+    title: "Design Review"
+  },
+  {
+    id: "mock-meeting-3",
+    platformId: "google_meet",
+    nativeMeetingId: "123-456-789",
+    platform: "google_meet",
+    status: "active",
+    startTime: new Date().toISOString(),
+    title: "Client Presentation"
+  }
+];
+
 // Mock data for demonstration
 const mockSegments: TranscriptionSegment[] = [
   {
@@ -145,9 +189,8 @@ export async function startTranscription(
       body: JSON.stringify(requestPayload),
     })
 
-    const data = await handleApiResponse<any>(response)
+    await handleApiResponse<any>(response)
 
-    // The response format may vary, adjust as needed based on Vexa API response
     return {
       success: true,
       meetingId: `${platform}/${nativeMeetingId}`, // We're storing the full ID that we need for future calls
@@ -180,18 +223,20 @@ export async function stopTranscription(meetingId: string): Promise<{ success: b
   // Real API implementation using Vexa API
   try {
     // The meetingId should be in the format "platform/nativeMeetingId"
-    const [platform, nativeMeetingId] = meetingId.split('/')
-    
-    if (!platform || !nativeMeetingId) {
+    const parts = meetingId.split('/');
+    if (parts.length < 2) {
       throw new Error("Invalid meeting ID format")
     }
+    
+    const platform = parts[0];
+    const nativeMeetingId = parts[1];
 
     const response = await fetch(`${API_BASE_URL}/bots/${platform}/${nativeMeetingId}`, {
       method: "DELETE",
       headers: getHeaders(),
     })
 
-    const data = await handleApiResponse<any>(response)
+    await handleApiResponse<any>(response)
 
     return {
       success: true,
@@ -240,32 +285,58 @@ export async function getTranscription(meetingId: string): Promise<Transcription
 
   // Real API implementation using Vexa API
   try {
-    // The meetingId should be in the format "platform/nativeMeetingId"
-    const [platform, nativeMeetingId] = meetingId.split('/')
+    console.log("getTranscription called with meetingId:", meetingId);
     
-    if (!platform || !nativeMeetingId) {
+    // The meetingId can be in format "platform/nativeMeetingId" or "platform/nativeMeetingId/id"
+    const parts = meetingId.split('/');
+    if (parts.length < 2) {
       throw new Error("Invalid meeting ID format")
     }
+    
+    const platform = parts[0];
+    const nativeMeetingId = parts[1];
+    
+    console.log(`Fetching transcript for platform=${platform}, nativeMeetingId=${nativeMeetingId}`);
 
     const response = await fetch(`${API_BASE_URL}/transcripts/${platform}/${nativeMeetingId}`, {
       method: "GET",
       headers: getHeaders(),
     })
 
+    console.log("Transcript API response status:", response.status);
+    
     const data = await handleApiResponse<any>(response)
+    console.log("Transcript API data received:", JSON.stringify(data).substring(0, 200) + "...");
+    
+    // Check if data contains segments directly
+    if (!data.segments && !data.transcript) {
+      console.error("API response missing segments data:", data);
+      throw new Error("API response missing segments data");
+    }
+
+    // Get segments from the correct location in the response
+    const segments = data.segments || (data.transcript ? data.transcript.segments : []) || [];
+    console.log(`Found ${segments.length} segments in API response`);
 
     // Transform the Vexa API response into our TranscriptionData format
-    // The segments might need to be mapped based on the actual Vexa API response structure
     return {
       meetingId,
       language: data.language || "en",
-      segments: data.segments.map((segment: any) => ({
-        id: segment.id || `segment-${Date.now()}-${Math.random()}`,
-        text: segment.text || "",
-        timestamp: segment.timestamp || new Date().toISOString(),
-        speaker: segment.speaker || "Unknown",
-      })),
-      status: "active", // You might want to get this from the API or another endpoint
+      segments: segments.map((segment: any) => {
+        // Create a deterministic ID based on the text and timestamp
+        // This ensures we can properly detect duplicates
+        const segmentText = segment.text || "";
+        const timestamp = segment.absolute_start_time || segment.timestamp || new Date().toISOString();
+        const stableId = `${timestamp}-${segmentText.slice(0, 20).replace(/\s+/g, '-')}`;
+        
+        return {
+          id: stableId,
+          text: segmentText,
+          timestamp: timestamp,
+          speaker: segment.speaker || "Unknown",
+        };
+      }),
+      status: data.status || "active",
       lastUpdated: new Date().toISOString(),
     }
   } catch (error) {
@@ -304,12 +375,14 @@ export async function getFullTranscript(
 
   // Real API implementation using Vexa API
   try {
-    // The meetingId should be in the format "platform/nativeMeetingId"
-    const [platform, nativeMeetingId] = meetingId.split('/')
-    
-    if (!platform || !nativeMeetingId) {
+    // The meetingId should be in the format "platform/nativeMeetingId/id"
+    const parts = meetingId.split('/');
+    if (parts.length < 2) {
       throw new Error("Invalid meeting ID format")
     }
+    
+    const platform = parts[0];
+    const nativeMeetingId = parts[1];
 
     // Get the latest transcript data
     const transcriptionData = await getTranscription(meetingId)
@@ -323,6 +396,160 @@ export async function getFullTranscript(
     }
   } catch (error) {
     console.error("Error getting full transcript:", error)
+    throw error
+  }
+}
+
+/**
+ * Get a list of all meetings
+ */
+export async function getMeetingHistory(): Promise<Meeting[]> {
+  // Use mock implementation if in mock mode
+  if (MOCK_MODE) {
+    await new Promise((resolve) => setTimeout(resolve, 800)) // Simulate API delay
+    return [...mockMeetings]
+  }
+
+  // Real API implementation using Vexa API
+  try {
+    const response = await fetch(`${API_BASE_URL}/meetings`, {
+      method: "GET",
+      headers: getHeaders(),
+    })
+
+    const data = await handleApiResponse<any>(response)
+
+    // Transform the API response to our Meeting interface
+    return data.meetings.map((meeting: any) => ({
+      id: `${meeting.platform}/${meeting.native_meeting_id}/${meeting.id}`,
+      platformId: meeting.platform,
+      nativeMeetingId: meeting.native_meeting_id,
+      platform: meeting.platform,
+      status: meeting.status || "stopped",
+      startTime: meeting.start_time || new Date().toISOString(),
+      endTime: meeting.end_time,
+      title: `Meeting ${meeting.native_meeting_id}`
+    }));
+  } catch (error) {
+    console.error("Error getting meeting history:", error)
+    throw error
+  }
+}
+
+/**
+ * Get a specific meeting's transcript without polling (for history view)
+ * @param meetingId The ID of the meeting to get the transcript for
+ */
+export async function getMeetingTranscript(meetingId: string): Promise<TranscriptionData> {
+  // This is similar to getTranscription but without adding new simulated segments in mock mode
+  
+  // Use mock implementation if in mock mode
+  if (MOCK_MODE) {
+    await new Promise((resolve) => setTimeout(resolve, 800)) // Simulate API delay
+
+    // If this meeting doesn't exist in our mock data, create it with mock segments
+    if (!mockTranscriptionData[meetingId]) {
+      // Find the mock meeting by ID
+      const mockMeeting = mockMeetings.find(m => m.id === meetingId);
+      
+      if (mockMeeting) {
+        // Create mock transcript for this meeting
+        mockTranscriptionData[meetingId] = {
+          meetingId,
+          language: "en",
+          segments: [...mockSegments], // Use the mock segments
+          status: mockMeeting.status,
+          lastUpdated: mockMeeting.endTime || new Date().toISOString(),
+        }
+      } else {
+        // Create a generic mock transcript if meeting not found
+        mockTranscriptionData[meetingId] = {
+          meetingId,
+          language: "en",
+          segments: [...mockSegments],
+          status: "stopped",
+          lastUpdated: new Date().toISOString(),
+        }
+      }
+    }
+
+    return { ...mockTranscriptionData[meetingId] }
+  }
+
+  // Real API implementation using Vexa API
+  try {
+    console.log("getMeetingTranscript called with meetingId:", meetingId);
+    
+    // Check if the meetingId is already in the format "platform/nativeMeetingId" or "platform/nativeMeetingId/id"
+    let platform, nativeMeetingId;
+    
+    const parts = meetingId.split('/');
+    if (parts.length >= 2) {
+      platform = parts[0];
+      nativeMeetingId = parts[1];
+      console.log(`Using platform=${platform}, nativeMeetingId=${nativeMeetingId} from meetingId`);
+    } else {
+      // Try to fetch meeting details to get platform and nativeMeetingId
+      console.log("Invalid meeting ID format, trying to fetch meeting details");
+      const meetings = await getMeetingHistory();
+      const meeting = meetings.find(m => m.id === meetingId);
+      
+      if (meeting) {
+        platform = meeting.platform;
+        nativeMeetingId = meeting.nativeMeetingId;
+        console.log(`Found meeting in history, using platform=${platform}, nativeMeetingId=${nativeMeetingId}`);
+      } else {
+        throw new Error("Meeting not found")
+      }
+    }
+    
+    if (!platform || !nativeMeetingId) {
+      throw new Error("Invalid meeting ID format")
+    }
+
+    console.log(`Fetching transcript for platform=${platform}, nativeMeetingId=${nativeMeetingId}`);
+    const response = await fetch(`${API_BASE_URL}/transcripts/${platform}/${nativeMeetingId}`, {
+      method: "GET",
+      headers: getHeaders(),
+    })
+
+    console.log("Transcript API response status:", response.status);
+    const data = await handleApiResponse<any>(response)
+    console.log("Transcript API data received:", JSON.stringify(data).substring(0, 200) + "...");
+
+    // Check if data contains segments directly
+    if (!data.segments && !data.transcript) {
+      console.error("API response missing segments data:", data);
+      throw new Error("API response missing segments data");
+    }
+
+    // Get segments from the correct location in the response
+    const segments = data.segments || (data.transcript ? data.transcript.segments : []) || [];
+    console.log(`Found ${segments.length} segments in API response`);
+
+    // Transform the Vexa API response into our TranscriptionData format
+    return {
+      meetingId,
+      language: data.language || "en",
+      segments: segments.map((segment: any) => {
+        // Create a deterministic ID based on the text and timestamp
+        // This ensures we can properly detect duplicates
+        const segmentText = segment.text || "";
+        const timestamp = segment.absolute_start_time || segment.timestamp || new Date().toISOString();
+        const stableId = `${timestamp}-${segmentText.slice(0, 20).replace(/\s+/g, '-')}`;
+        
+        return {
+          id: stableId,
+          text: segmentText,
+          timestamp: timestamp,
+          speaker: segment.speaker || "Unknown",
+        };
+      }) || [],
+      status: "stopped", // Historical view always shows as stopped
+      lastUpdated: new Date().toISOString(),
+    }
+  } catch (error) {
+    console.error("Error getting meeting transcript:", error)
     throw error
   }
 }

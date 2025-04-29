@@ -248,6 +248,59 @@ export async function stopTranscription(meetingId: string): Promise<{ success: b
 }
 
 /**
+ * Update the language configuration for an ongoing transcription session
+ * @param meetingId The ID of the meeting to update
+ * @param language The new language code (e.g., 'en', 'es', 'fr', 'de', etc.)
+ */
+export async function updateTranscriptionLanguage(meetingId: string, language: string): Promise<{ success: boolean }> {
+  // Use mock implementation if in mock mode
+  if (MOCK_MODE) {
+    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API delay
+
+    // Update mock data language
+    if (mockTranscriptionData[meetingId]) {
+      mockTranscriptionData[meetingId].language = language;
+    }
+
+    return {
+      success: true,
+    }
+  }
+
+  // Real API implementation using Vexa API
+  try {
+    // The meetingId should be in the format "platform/nativeMeetingId"
+    const parts = meetingId.split('/');
+    if (parts.length < 2) {
+      throw new Error("Invalid meeting ID format")
+    }
+    
+    const platform = parts[0];
+    const nativeMeetingId = parts[1];
+
+    const updateConfigUrl = `${API_BASE_URL}/bots/${platform}/${nativeMeetingId}/config`;
+    const updatePayload = {
+      language: language
+    };
+
+    const response = await fetch(updateConfigUrl, {
+      method: "PUT",
+      headers: getHeaders(),
+      body: JSON.stringify(updatePayload),
+    });
+
+    await handleApiResponse<any>(response);
+
+    return {
+      success: true,
+    }
+  } catch (error) {
+    console.error("Error updating transcription language:", error)
+    throw error
+  }
+}
+
+/**
  * Get the current transcription data for a meeting
  * @param meetingId The ID of the meeting
  */

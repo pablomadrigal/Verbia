@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { StartForm } from "@/components/transcription/start-form"
 import { TranscriptionDisplay } from "@/components/transcription/transcription-display"
-import { ApiStatus } from "@/components/transcription/api-status"
 import { Meeting } from "@/lib/transcription-service"
 import { ChevronRight, ChevronLeft, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -113,30 +112,22 @@ export function AppLayout({ user }: AppLayoutProps) {
       
       {/* Main content area that expands when sidebar is collapsed */}
       <div className={`
-        flex-1 overflow-y-auto p-6 transition-all
-        ${!sidebarOpen ? 'md:pl-8' : ''}
+        flex-1 overflow-hidden flex flex-col p-2 transition-all
+        ${!sidebarOpen ? 'md:pl-4' : ''}
       `}>
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-4 flex justify-between items-center">
-            <div>
-              <div className="text-sm text-gray-500 mb-1">Signed in as</div>
-              <div className="font-medium">{user.email}</div>
-            </div>
-            
-            {/* Conditional toggle for when sidebar is collapsed on desktop */}
-            {!sidebarOpen && (
+        <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col h-full">
+          {!sidebarOpen && (
+            <div className="mb-1 flex justify-end">
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => setSidebarOpen(true)}
-                className="hidden md:flex"
+                className="hidden md:flex h-6 text-xs py-0 px-2"
               >
-                <ChevronRight className="h-4 w-4 mr-1" /> Show Sidebar
+                <ChevronRight className="h-3 w-3 mr-1" /> Show Sidebar
               </Button>
-            )}
-          </div>
-
-          <ApiStatus />
+            </div>
+          )}
 
           {mode === "setup" && (
             <StartForm 
@@ -146,29 +137,23 @@ export function AppLayout({ user }: AppLayoutProps) {
           )}
 
           {mode === "live" && activeMeetingId && (
-            <>
-              <div className="text-sm font-medium text-blue-600 mb-2">
-                Live Transcription Session
-              </div>
+            <div className="flex-1 flex flex-col h-full">
               <TranscriptionDisplay 
                 meetingId={activeMeetingId} 
                 onStop={handleStopMeeting}
                 isLive={true}
               />
-            </>
+            </div>
           )}
 
           {mode === "history" && selectedHistoricalMeeting && (
-            <>
-              <div className="text-sm font-medium text-gray-600 mb-2">
-                Historical Meeting View
-              </div>
+            <div className="flex-1 flex flex-col h-full">
               <TranscriptionDisplay 
                 meetingId={selectedHistoricalMeeting.id}
                 isLive={false}
                 title={selectedHistoricalMeeting.title || `Meeting ${selectedHistoricalMeeting.nativeMeetingId}`}
               />
-            </>
+            </div>
           )}
         </div>
       </div>

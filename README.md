@@ -8,6 +8,12 @@ A real-time transcription assistant built on top of the [Vexa API](https://githu
 
 This project is an example assistant built on top of the [Vexa API](https://github.com/Vexa-ai/vexa), showcasing how to integrate real-time meeting transcription into a web application. It provides a user-friendly interface for transcribing meetings across multiple platforms, with support for multiple languages and real-time updates.
 
+## Demo
+
+Check out our demo video:
+
+[![Vexa Client Demo](https://img.youtube.com/vi/bA_4DVDO_KM/0.jpg)](https://www.youtube.com/watch?v=bA_4DVDO_KM)
+
 ## Features
 
 - **Real-time Transcription**: Capture meeting content as it happens with minimal latency

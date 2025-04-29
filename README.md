@@ -2,8 +2,6 @@
 
 A real-time transcription assistant built on top of the [Vexa API](https://github.com/Vexa-ai/vexa), designed to provide seamless meeting transcription with a clean, modern interface.
 
-![Vexa Client Screenshot](docs/screenshot.png)
-
 ## Overview
 
 This project is an example assistant built on top of the [Vexa API](https://github.com/Vexa-ai/vexa), showcasing how to integrate real-time meeting transcription into a web application. It provides a user-friendly interface for transcribing meetings across multiple platforms, with support for multiple languages and real-time updates.
@@ -36,7 +34,7 @@ Check out our demo video:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/vexa-client.git
+   git clone https://github.com/Vexa-ai/vexa_example_client
    cd vexa-client
    ```
 

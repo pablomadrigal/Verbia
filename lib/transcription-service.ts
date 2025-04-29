@@ -1,4 +1,5 @@
 import { MOCK_MODE } from "./config"
+import { parseMeetingUrl } from "./utils"
 
 // Types for our transcription service
 export interface TranscriptionSegment {
@@ -60,7 +61,15 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_VEXA_API_URL || "https://gateway.de
 async function handleApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    throw new Error(`API error: ${response.status} ${response.statusText} - ${errorData.message || "Unknown error"}`)
+    
+    // Specific handling for 409 conflict (existing bot)
+    if (response.status === 409) {
+      const error = new Error(`ExistingBotError: ${errorData.detail || "A bot is already running for this meeting"}`)
+      error.name = "ExistingBotError"
+      throw error
+    }
+    
+    throw new Error(`API error: ${response.status} ${response.statusText} - ${errorData.detail || errorData.message || "Unknown error"}`)
   }
   return response.json()
 }
@@ -73,26 +82,6 @@ function getHeaders() {
   return {
     "Content-Type": "application/json",
     "X-API-Key": apiKey,
-  }
-}
-
-// Extract meeting ID and platform from URL
-function parseMeetingUrl(url: string): { platform: string; nativeMeetingId: string } {
-  try {
-    const urlObj = new URL(url)
-    
-    // Handle Google Meet URLs
-    if (urlObj.hostname === "meet.google.com") {
-      // Extract meeting ID from URL path
-      const meetingId = urlObj.pathname.substring(1) // Remove leading slash
-      return { platform: "google_meet", nativeMeetingId: meetingId }
-    }
-    
-    // Add support for other platforms here as needed
-    
-    throw new Error("Unsupported meeting platform. Currently only Google Meet is supported.")
-  } catch (error) {
-    throw new Error("Invalid meeting URL. Please provide a valid Google Meet URL.")
   }
 }
 

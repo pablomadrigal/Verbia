@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { startTranscription } from "@/lib/transcription-service"
+import { startTranscription, stopTranscription } from "@/lib/transcription-service"
 import { useState } from "react"
+import { parseMeetingUrl } from "@/lib/utils"
 
 interface StartFormProps {
   onStart: (meetingId: string) => void
@@ -21,11 +22,29 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
   const [language, setLanguage] = useState("auto")
   const [botName, setBotName] = useState("Vexa")
   const [isLoading, setIsLoading] = useState(false)
+  const [isStoppingBot, setIsStoppingBot] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [existingBotInfo, setExistingBotInfo] = useState<{ platform: string; nativeMeetingId: string } | null>(null)
 
   if (isCollapsed) {
     return null
   }
+
+  const handleStopExistingBot = async () => {
+    if (!existingBotInfo) return;
+    
+    try {
+      setIsStoppingBot(true);
+      const meetingId = `${existingBotInfo.platform}/${existingBotInfo.nativeMeetingId}`;
+      await stopTranscription(meetingId);
+      setExistingBotInfo(null);
+      setError(null);
+    } catch (err: any) {
+      setError(`Failed to stop existing bot: ${err.message}`);
+    } finally {
+      setIsStoppingBot(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,6 +69,7 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
     try {
       setIsLoading(true)
       setError(null)
+      setExistingBotInfo(null)
 
       const result = await startTranscription(meetingUrl, language, botName)
 
@@ -59,8 +79,21 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
         setError("Failed to start transcription bot")
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred while starting the transcription bot")
-      console.error(err)
+      console.error("Start error:", err);
+      
+      // Check if this is the existing bot error
+      if (err.name === "ExistingBotError") {
+        try {
+          // Try to parse the meeting URL to extract platform and ID
+          const parsed = parseMeetingUrl(meetingUrl);
+          setExistingBotInfo(parsed);
+          setError("There is already a bot running for this meeting.");
+        } catch (parseError) {
+          setError(err.message || "An error occurred while starting the transcription bot");
+        }
+      } else {
+        setError(err.message || "An error occurred while starting the transcription bot");
+      }
     } finally {
       setIsLoading(false)
     }
@@ -135,10 +168,26 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
             </Alert>
           )}
 
+          {existingBotInfo && (
+            <div className="flex gap-3 items-center">
+              <Button 
+                type="button" 
+                onClick={handleStopExistingBot} 
+                variant="destructive"
+                disabled={isStoppingBot}
+              >
+                {isStoppingBot ? "Stopping..." : "Stop Existing Bot"}
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Stop the existing bot before adding a new one
+              </p>
+            </div>
+          )}
+
           <Button 
             type="submit" 
             className="w-full bg-blue-600 hover:bg-blue-700 transition-colors"
-            disabled={isLoading}
+            disabled={isLoading || isStoppingBot}
           >
             {isLoading ? "Starting Bot..." : "Add Bot to Meeting"}
           </Button>

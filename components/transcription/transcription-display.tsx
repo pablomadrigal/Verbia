@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, Clock } from "lucide-react"
 import {
   type TranscriptionData,
   type TranscriptionSegment,
@@ -13,16 +13,7 @@ import {
 import { useEffect, useRef, useState } from "react"
 import { DownloadTranscript } from "./download-transcript"
 import { TranscriptSearch } from "./transcript-search"
-
-// Speaker colors for visual distinction
-const SPEAKER_COLORS = [
-  "bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800",
-  "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800",
-  "bg-purple-100 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800",
-  "bg-orange-100 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800",
-  "bg-pink-100 dark:bg-pink-900/30 border-pink-200 dark:border-pink-800",
-  "bg-cyan-100 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-800",
-]
+import { cn } from "@/lib/utils"
 
 interface TranscriptionDisplayProps {
   meetingId: string | null
@@ -36,7 +27,6 @@ export function TranscriptionDisplay({ meetingId, onStop }: TranscriptionDisplay
   const [error, setError] = useState<string | null>(null)
   const [segments, setSegments] = useState<TranscriptionSegment[]>([])
   const [highlightedSegmentId, setHighlightedSegmentId] = useState<string | null>(null)
-  const [speakerColors, setSpeakerColors] = useState<Record<string, string>>({})
   const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const transcriptionRef = useRef<HTMLDivElement>(null)
   const segmentRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -61,20 +51,6 @@ export function TranscriptionDisplay({ meetingId, onStop }: TranscriptionDisplay
         // Combine existing segments with new ones, avoiding duplicates
         const existingIds = new Set(prevSegments.map((s) => s.id))
         const newSegments = data.segments.filter((s) => !existingIds.has(s.id))
-
-        // Assign colors to new speakers
-        const updatedSpeakerColors = { ...speakerColors }
-        newSegments.forEach((segment) => {
-          if (segment.speaker && !updatedSpeakerColors[segment.speaker]) {
-            const colorIndex = Object.keys(updatedSpeakerColors).length % SPEAKER_COLORS.length
-            updatedSpeakerColors[segment.speaker] = SPEAKER_COLORS[colorIndex]
-          }
-        })
-
-        // Update speaker colors if new speakers were found
-        if (Object.keys(updatedSpeakerColors).length !== Object.keys(speakerColors).length) {
-          setSpeakerColors(updatedSpeakerColors)
-        }
 
         return [...prevSegments, ...newSegments]
       })
@@ -177,12 +153,18 @@ export function TranscriptionDisplay({ meetingId, onStop }: TranscriptionDisplay
     return null
   }
 
+  // Format time for display
+  const formatTime = (timestamp: string): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-2">
+    <Card className="w-full border border-gray-200 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
+        <CardTitle className="flex items-center gap-2 text-gray-800">
           Live Transcription
-          {isPolling && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isPolling && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
         </CardTitle>
         <div className="flex items-center gap-2">
           {meetingId && (
@@ -197,7 +179,7 @@ export function TranscriptionDisplay({ meetingId, onStop }: TranscriptionDisplay
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 p-4">
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -208,27 +190,33 @@ export function TranscriptionDisplay({ meetingId, onStop }: TranscriptionDisplay
 
         {segments.length > 0 && <TranscriptSearch segments={segments} onHighlight={handleHighlightSegment} />}
 
-        <div ref={transcriptionRef} className="h-[400px] overflow-y-auto border rounded-md p-4 space-y-4">
+        <div 
+          ref={transcriptionRef} 
+          className="h-[400px] overflow-y-auto border border-gray-200 rounded-md bg-gray-50 p-4"
+        >
           {segments.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">Waiting for transcription to begin...</div>
+            <div className="text-center text-gray-500 py-8">Waiting for transcription to begin...</div>
           ) : (
-            segments.map((segment) => (
-              <div
-                key={segment.id}
-                ref={(el) => (segmentRefs.current[segment.id] = el)}
-                className={`space-y-1 p-2 rounded-md transition-colors border-l-4 ${
-                  highlightedSegmentId === segment.id
-                    ? "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-400"
-                    : segment.speaker && speakerColors[segment.speaker]
-                      ? speakerColors[segment.speaker]
-                      : "border-transparent"
-                }`}
-              >
-                {segment.speaker && <div className="text-sm font-medium text-primary">{segment.speaker}</div>}
-                <div className="text-base">{segment.text}</div>
-                <div className="text-xs text-muted-foreground">{new Date(segment.timestamp).toLocaleTimeString()}</div>
-              </div>
-            ))
+            <div className="space-y-2 font-light text-gray-800">
+              {segments.map((segment) => (
+                <div
+                  key={segment.id}
+                  ref={(el) => (segmentRefs.current[segment.id] = el)}
+                  className={cn(
+                    "px-3 py-2 transition-colors border-l-2 border-l-gray-200 hover:bg-gray-100",
+                    highlightedSegmentId === segment.id && "bg-gray-200 border-l-gray-500"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm leading-relaxed">{segment.text}</p>
+                    <span className="text-xs text-gray-500 whitespace-nowrap pt-1 pl-2 flex items-center gap-0.5">
+                      <Clock className="h-3 w-3" />
+                      {formatTime(segment.timestamp)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </CardContent>

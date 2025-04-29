@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { PlusCircle, Clock, CheckCircle, AlertCircle, History, FileText } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
+import { PlusCircle, RefreshCw, Circle, CheckCircle2, AlertCircle, MoreVertical } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Meeting, getMeetingHistory } from "@/lib/transcription-service"
-import { formatDistanceToNow } from "date-fns"
+import { cn } from "@/lib/utils"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface SidebarProps {
   onNewMeeting: () => void
@@ -14,138 +15,176 @@ interface SidebarProps {
   selectedMeetingId: string | null
 }
 
-export function Sidebar({ 
-  onNewMeeting, 
-  onSelectMeeting, 
-  selectedMeetingId 
-}: SidebarProps) {
+export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: SidebarProps) {
+  const router = useRouter()
   const [meetings, setMeetings] = useState<Meeting[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hasActiveMeetings, setHasActiveMeetings] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const fetchMeetings = async () => {
+  const loadMeetings = async () => {
     setIsLoading(true)
     setError(null)
+    
     try {
-      console.log("Fetching meeting history");
-      const meetingData = await getMeetingHistory()
-      
-      // Sort by start time, most recent first
-      const sorted = [...meetingData].sort(
-        (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-      )
-      
-      // Check if there are any active meetings
-      const active = sorted.some(meeting => meeting.status === "active")
-      setHasActiveMeetings(active)
-      
-      if (active) {
-        console.log("Active meetings found, will refresh more frequently");
-      }
-      
-      setMeetings(sorted)
+      const fetchedMeetings = await getMeetingHistory()
+      // Sort meetings by startTime (most recent first)
+      const sortedMeetings = fetchedMeetings
+        .sort((a, b) => {
+          // Fallback to id comparison if startTime is not available
+          if (!a.startTime) return 1
+          if (!b.startTime) return -1
+          return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+        })
+
+      console.log("Fetched meetings:", sortedMeetings)
+      setMeetings(sortedMeetings)
     } catch (err) {
       console.error("Error fetching meetings:", err)
-      setError("Failed to load meeting history")
+      setError("Failed to load meetings")
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await loadMeetings()
+    setIsRefreshing(false)
+  }
+
   useEffect(() => {
-    fetchMeetings()
-    
-    // Set up polling - more frequent if there are active meetings
-    const interval = setInterval(
-      fetchMeetings, 
-      hasActiveMeetings ? 10000 : 30000 // Refresh every 10s if active, 30s otherwise
-    )
-    
-    return () => clearInterval(interval)
-  }, [hasActiveMeetings])
-  
-  // Initial fetch
-  useEffect(() => {
-    fetchMeetings()
+    loadMeetings()
   }, [])
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | undefined) => {
     switch (status) {
       case "active":
-        return <Clock className="h-4 w-4 text-blue-500" />
+        return <Circle className="h-4 w-4 fill-green-500 text-green-500 animate-pulse" />
+      case "completed":
       case "stopped":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />
       case "error":
         return <AlertCircle className="h-4 w-4 text-red-500" />
       default:
-        return <FileText className="h-4 w-4 text-gray-500" />
+        return <Circle className="h-4 w-4 text-gray-300" />
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "Unknown date"
+    
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true })
+      const date = new Date(dateString)
+      // Format: "Today, 2:30 PM" or "Jan 5, 2:30 PM"
+      const today = new Date()
+      const isToday = date.getDate() === today.getDate() && 
+                      date.getMonth() === today.getMonth() && 
+                      date.getFullYear() === today.getFullYear()
+      
+      const timeOptions: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
+      const time = date.toLocaleTimeString(undefined, timeOptions)
+      
+      if (isToday) {
+        return `Today, ${time}`
+      } else {
+        const dateOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+        const dateStr = date.toLocaleDateString(undefined, dateOptions)
+        return `${dateStr}, ${time}`
+      }
     } catch (e) {
-      return "Unknown date"
+      console.error("Error formatting date:", e)
+      return dateString
     }
   }
 
   return (
-    <div className="w-64 border-r border-gray-200 h-screen overflow-hidden flex flex-col bg-gray-50">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-medium text-gray-800 flex items-center gap-2">
-          <History className="h-5 w-5" />
-          Meetings
-        </h2>
-      </div>
-      
+    <div className="h-full w-full border-r border-gray-200 bg-gray-50 flex flex-col">
       <div className="p-4">
-        <Button 
-          onClick={onNewMeeting}
-          className="w-full"
-          variant="outline"
-        >
-          <PlusCircle className="h-4 w-4 mr-2" /> New Meeting
-        </Button>
+        <h2 className="font-semibold text-lg mb-4">Vexa Transcription</h2>
+        
+        <div className="flex justify-between items-center mb-4">
+          <Button onClick={onNewMeeting} variant="default" className="w-full">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Meeting
+          </Button>
+        </div>
+        
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-gray-500">Meeting History</h3>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn(
+              "h-4 w-4",
+              isRefreshing && "animate-spin"
+            )} />
+          </Button>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-2">
-        {isLoading && meetings.length === 0 ? (
-          <div className="text-sm text-center text-gray-500 mt-4">Loading meetings...</div>
-        ) : error ? (
-          <div className="text-sm text-center text-red-500 mt-4">{error}</div>
-        ) : meetings.length === 0 ? (
-          <div className="text-sm text-center text-gray-500 mt-4">No meetings found</div>
-        ) : (
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {isLoading ? (
           <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
+            {error}
+          </div>
+        ) : meetings.length === 0 ? (
+          <div className="text-sm text-gray-500 italic">No meetings found</div>
+        ) : (
+          <div className="space-y-1">
             {meetings.map((meeting) => (
-              <Card
-                key={meeting.id}
-                className={cn(
-                  "p-3 hover:bg-gray-100 cursor-pointer transition-colors border",
-                  selectedMeetingId === meeting.id ? "bg-gray-100 border-gray-300" : "bg-white",
-                  meeting.status === "active" ? "border-blue-300" : ""
-                )}
+              <div 
+                key={meeting.id} 
                 onClick={() => onSelectMeeting(meeting)}
+                className={cn(
+                  "flex items-center justify-between p-2 rounded-md cursor-pointer",
+                  "hover:bg-gray-200 transition-colors",
+                  selectedMeetingId === meeting.id && "bg-gray-200"
+                )}
               >
-                <div className="flex items-start">
-                  <div className="mr-2 mt-0.5">
-                    {getStatusIcon(meeting.status)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900 truncate">
-                      {meeting.title || `Meeting ${meeting.nativeMeetingId}`}
+                <div className="flex items-center space-x-2 overflow-hidden">
+                  {getStatusIcon(meeting.status)}
+                  <div className="truncate">
+                    <div className="text-sm font-medium truncate">
+                      {meeting.title || `Meeting ${meeting.nativeMeetingId || ""}`}
                     </div>
-                    <div className="text-xs text-gray-500 truncate flex items-center">
-                      {meeting.status === "active" && (
-                        <span className="inline-block h-2 w-2 rounded-full bg-blue-500 mr-1 animate-pulse"></span>
-                      )}
+                    <div className="text-xs text-gray-500">
                       {formatDate(meeting.startTime)}
                     </div>
                   </div>
                 </div>
-              </Card>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">Open menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      // Copy meeting ID to clipboard
+                      navigator.clipboard.writeText(meeting.id);
+                    }}>
+                      Copy ID
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ))}
           </div>
         )}

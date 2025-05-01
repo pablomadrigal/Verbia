@@ -204,39 +204,38 @@ export function TranscriptionDisplay({
       // Reset retry count on successful request
       retryCount.current = 0
 
-      // Track new segment IDs for highlight effect
-      const justAddedSegmentIds = new Set<string>();
+      // Track new or changed segments for highlight effect
+      const changedSegmentIds = new Set<string>();
 
-      // Update our segments with any new ones
+      // Always use the most recent segments from the API
+      // but maintain the highlight effect for new/changed content
       setSegments((prevSegments) => {
-        // Create a map of existing segments by ID for easy lookup
-        const existingSegmentsMap = new Map(prevSegments.map(s => [s.id, s]));
+        // Get the previous segments as a map for easy comparison
+        const prevSegmentsMap = new Map(prevSegments.map(s => [s.id, s]));
         
-        // Add any segments that don't already exist
-        let hasNewSegments = false;
+        // Mark segments that are new or changed compared to previous state
         data.segments.forEach(segment => {
-          if (!existingSegmentsMap.has(segment.id)) {
-            existingSegmentsMap.set(segment.id, segment);
-            hasNewSegments = true;
-            justAddedSegmentIds.add(segment.id);
+          const prevSegment = prevSegmentsMap.get(segment.id);
+          if (!prevSegment || prevSegment.text !== segment.text) {
+            changedSegmentIds.add(segment.id);
           }
         });
         
-        // If no new segments, just return the previous array to avoid re-renders
-        if (!hasNewSegments) {
-          return prevSegments;
+        // Log changes if any
+        if (changedSegmentIds.size > 0) {
+          console.log(`Found ${changedSegmentIds.size} new or updated segments`);
         }
         
-        console.log(`Added ${justAddedSegmentIds.size} new segments`);
-        
-        // Convert map back to array and sort by timestamp
-        return Array.from(existingSegmentsMap.values())
-          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      })
+        // Always return the complete set of segments from the API
+        // This ensures we're always in sync with the backend
+        return [...data.segments].sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
 
-      // Update the highlight state if we have new segments
-      if (justAddedSegmentIds.size > 0) {
-        setNewSegmentIds(justAddedSegmentIds);
+      // Update the highlight state
+      if (changedSegmentIds.size > 0) {
+        setNewSegmentIds(changedSegmentIds);
       }
 
       // Update language if it has changed in the transcription data

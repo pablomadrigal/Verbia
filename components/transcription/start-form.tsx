@@ -11,6 +11,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { startTranscription, stopTranscription } from "@/lib/transcription-service"
 import { useState } from "react"
 import { parseMeetingUrl } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
+import { cn } from "@/lib/utils"
 
 interface StartFormProps {
   onStart: (meetingId: string) => void
@@ -25,6 +27,10 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
   const [isStoppingBot, setIsStoppingBot] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingBotInfo, setExistingBotInfo] = useState<{ platform: string; nativeMeetingId: string } | null>(null)
+  const { toast } = useToast()
+
+  // Regex to validate and extract Google Meet ID
+  const meetUrlRegex = /^https:\/\/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})(?:\?.*)?$/;
 
   if (isCollapsed) {
     return null
@@ -46,56 +52,36 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleStart = async () => {
+    setError(null)
+    const match = meetingUrl.trim().match(meetUrlRegex);
 
-    if (!meetingUrl) {
-      setError("Please enter a meeting URL")
-      return
+    if (!match || !match[1]) {
+      setError("Invalid Google Meet URL. Please use the format https://meet.google.com/xxx-xxxx-xxx");
+      return;
     }
 
-    // Basic URL validation for Google Meet
+    // Use the extracted meeting code (match[1]) to form the clean URL or pass the code directly
+    // For now, we'll assume `startTranscription` expects the full cleaned URL
+    const cleanUrl = `https://meet.google.com/${match[1]}`;
+
+    setIsLoading(true)
     try {
-      const url = new URL(meetingUrl)
-      if (url.hostname !== "meet.google.com") {
-        setError("Please enter a valid Google Meet URL. Currently, only Google Meet is supported.")
-        return
-      }
-    } catch (e) {
-      setError("Please enter a valid URL (e.g., https://meet.google.com/xxx-xxxx-xxx)")
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      setError(null)
-      setExistingBotInfo(null)
-
-      console.log("Starting transcription for meeting URL:", meetingUrl);
-      const result = await startTranscription(meetingUrl, language, botName)
-      console.log("Transcription started successfully, meetingId:", result.meetingId);
-
-      if (result.success) {
-        onStart(result.meetingId)
-      } else {
-        setError("Failed to start transcription bot")
-      }
+      // Assuming startTranscription now takes the cleaned URL
+      const { meetingId } = await startTranscription(cleanUrl)
+      toast({
+        title: "Transcription Started",
+        description: `Meeting ID: ${meetingId}`,
+      })
+      onStart(meetingId)
     } catch (err: any) {
-      console.error("Start error:", err);
-      
-      // Check if this is the existing bot error
-      if (err.name === "ExistingBotError") {
-        try {
-          // Try to parse the meeting URL to extract platform and ID
-          const parsed = parseMeetingUrl(meetingUrl);
-          setExistingBotInfo(parsed);
-          setError("There is already a bot running for this meeting.");
-        } catch (parseError) {
-          setError(err.message || "An error occurred while starting the transcription bot");
-        }
-      } else {
-        setError(err.message || "An error occurred while starting the transcription bot");
-      }
+      console.error("Error starting transcription:", err)
+      setError(err.message || "Failed to start transcription. Check API Key and URL.")
+      toast({
+        title: "Error",
+        description: err.message || "Failed to start transcription.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -108,15 +94,18 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
         <CardDescription>Enter a Google Meet URL to add a transcription bot to your meeting</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleStart} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="meeting-url" className="font-medium">Google Meet URL</Label>
             <Input
               id="meeting-url"
               placeholder="https://meet.google.com/xxx-xxxx-xxx"
               value={meetingUrl}
-              onChange={(e) => setMeetingUrl(e.target.value)}
-              className="focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
+              onChange={(e) => {
+                setMeetingUrl(e.target.value)
+                setError(null) // Clear error when user types
+              }}
+              className={error ? "border-red-500" : "focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"}
               required
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -151,7 +140,7 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bot-name" className="font-medium">Bot Name (Optional)</Label>
+            <Label htmlFor="bot-name" className="font-medium">Bot Name</Label>
             <Input
               id="bot-name"
               placeholder="Vexa"
@@ -189,7 +178,7 @@ export function StartForm({ onStart, isCollapsed }: StartFormProps) {
           <Button 
             type="submit" 
             className="w-full bg-blue-600 hover:bg-blue-700 transition-colors"
-            disabled={isLoading || isStoppingBot}
+            disabled={isLoading || isStoppingBot || !meetingUrl}
           >
             {isLoading ? "Starting Bot..." : "Add Bot to Meeting"}
           </Button>

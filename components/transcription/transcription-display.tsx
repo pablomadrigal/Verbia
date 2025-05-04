@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2, Clock, History, Globe, Search } from "lucide-react"
+import { AlertCircle, Loader2, Clock, History, Globe, Search, Timer } from "lucide-react"
 import {
   type TranscriptionData,
   type TranscriptionSegment,
@@ -12,7 +12,7 @@ import {
   getMeetingTranscript,
   updateTranscriptionLanguage
 } from "@/lib/transcription-service"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { DownloadTranscript } from "./download-transcript"
 import { TranscriptSearch } from "./transcript-search"
 import { cn } from "@/lib/utils"
@@ -149,6 +149,50 @@ function LanguageSelector({
       </PopoverContent>
     </Popover>
   )
+}
+
+// Countdown component for waiting screen
+function TranscriptionCountdown() {
+  const [countdown, setCountdown] = useState(10);
+  const [countdownComplete, setCountdownComplete] = useState(false);
+  
+  useEffect(() => {
+    if (countdown <= 0) {
+      setCountdownComplete(true);
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      setCountdown(prev => prev - 1);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [countdown]);
+  
+  return (
+    <div className="text-center py-4 flex flex-col items-center space-y-2">
+      {!countdownComplete ? (
+        <>
+          <div className="flex items-center text-blue-500 mb-1">
+            <Timer className="h-5 w-5 mr-2 animate-pulse" />
+            <span className="font-medium">Connecting bot to meeting</span>
+          </div>
+          <div className="text-gray-500">
+            Please wait <span className="font-semibold text-blue-600">{countdown}</span> seconds...
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-green-600 font-medium">
+            The bot is attempting to join your meeting
+          </div>
+          <div className="text-gray-500 text-sm mt-1">
+            Please allow the bot to attend the meeting if prompted
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 interface TranscriptionDisplayProps {
@@ -476,7 +520,7 @@ export function TranscriptionDisplay({
           {segments.length === 0 && !isLoading ? (
             <div className="text-center text-gray-500 py-4">
               {isLive 
-                ? "Waiting for transcription to begin..." 
+                ? <TranscriptionCountdown />
                 : "No transcript available for this meeting."
               }
             </div>
@@ -485,7 +529,7 @@ export function TranscriptionDisplay({
               {segments.map((segment) => (
                 <div
                   key={segment.id}
-                  ref={(el) => (segmentRefs.current[segment.id] = el)}
+                  ref={el => { segmentRefs.current[segment.id] = el; }}
                   className={cn(
                     "px-2 py-1 transition-colors border-l-2 border-l-gray-200 hover:bg-gray-100",
                     highlightedSegmentId === segment.id && "bg-gray-200 border-l-gray-500",

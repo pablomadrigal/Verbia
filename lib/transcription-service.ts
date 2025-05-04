@@ -118,15 +118,88 @@ async function handleApiResponse<T>(response: Response): Promise<T> {
   return response.json()
 }
 
-// Function to get headers with Vexa API key
-function getHeaders() {
-  // Get API key from environment variables
-  const apiKey = process.env.NEXT_PUBLIC_VEXA_API_KEY || ""
-
-  return {
-    "Content-Type": "application/json",
-    "X-API-Key": apiKey,
+// Function to get the API key - simplified approach
+export function getApiKey(): string {
+  try {
+    // Only attempt to get from cookies on client side
+    if (typeof window !== 'undefined') {
+      // Direct approach to get a specific cookie
+      const match = document.cookie.match(/(^|;)\s*vexa_api_key\s*=\s*([^;]+)/);
+      const cookieValue = match ? decodeURIComponent(match[2]) : '';
+      
+      if (cookieValue) {
+        console.log("Found API key in cookies");
+        return cookieValue;
+      }
+    }
+    
+    // If we couldn't get from cookies, try environment variable
+    const envKey = process.env.NEXT_PUBLIC_VEXA_API_KEY || '';
+    return envKey;
+  } catch (error) {
+    console.error("Error getting API key:", error);
+    return '';
   }
+}
+
+// Function to set the API key in cookies - simplified
+export function setApiKey(key: string): void {
+  try {
+    if (typeof window !== 'undefined') {
+      // Set a cookie that expires in 30 days
+      const days = 30;
+      const date = new Date();
+      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+      
+      // Simplified cookie setting with no spaces
+      document.cookie = `vexa_api_key=${encodeURIComponent(key)};expires=${date.toUTCString()};path=/`;
+      
+      // Immediately verify the cookie was set
+      setTimeout(() => {
+        const isSet = document.cookie.includes('vexa_api_key=');
+        console.log(`API key cookie set: ${isSet}`);
+      }, 10);
+    }
+  } catch (error) {
+    console.error("Error setting API key:", error);
+  }
+}
+
+// Function to clear the API key from cookies
+export function clearApiKey(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      document.cookie = 'vexa_api_key=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+      console.log("API key cookie cleared");
+    }
+  } catch (error) {
+    console.error("Error clearing API key:", error);
+  }
+}
+
+// Function to get headers with Vexa API key - with extra logging
+function getHeaders() {
+  // Get the API key
+  const apiKey = getApiKey();
+  
+  // Add extensive logging
+  console.log("Building API headers");
+  console.log("Has API key:", !!apiKey);
+  if (apiKey) {
+    // Only log part of the key for security
+    console.log("API key starts with:", apiKey.substring(0, 4));
+  }
+  
+  // Create headers with mandatory fields
+  const headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": apiKey
+  };
+  
+  // Log what's being sent
+  console.log("Headers being sent:", JSON.stringify(headers));
+  
+  return headers;
 }
 
 /**

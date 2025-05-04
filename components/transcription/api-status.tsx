@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle2, InfoIcon } from "lucide-react"
+import { AlertCircle, CheckCircle2, InfoIcon, Settings, ExternalLink } from "lucide-react"
 import { MOCK_MODE } from "@/lib/config"
 import { Button } from "../ui/button"
+import { getApiKey } from "@/lib/transcription-service"
+import Link from "next/link"
 
 export function ApiStatus() {
   const [apiConfigured, setApiConfigured] = useState<boolean | null>(null)
@@ -21,7 +23,9 @@ export function ApiStatus() {
 
     // Check if API configuration is available
     const apiUrl = process.env.NEXT_PUBLIC_VEXA_API_URL
-    const apiKey = process.env.NEXT_PUBLIC_VEXA_API_KEY
+    
+    // Use our getApiKey function that checks cookies first
+    const apiKey = typeof window !== 'undefined' ? getApiKey() : "";
 
     setApiConfigured(!!(apiUrl && apiKey))
   }, [])
@@ -33,7 +37,9 @@ export function ApiStatus() {
     try {
       // Try to get status of running bots
       const apiUrl = process.env.NEXT_PUBLIC_VEXA_API_URL
-      const apiKey = process.env.NEXT_PUBLIC_VEXA_API_KEY
+      
+      // Use our getApiKey function that checks cookies first
+      const apiKey = typeof window !== 'undefined' ? getApiKey() : "";
       
       const response = await fetch(`${apiUrl}/bots/status`, {
         method: 'GET',
@@ -67,9 +73,26 @@ export function ApiStatus() {
       <Alert variant="destructive" className="mb-4">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>API Configuration Missing</AlertTitle>
-        <AlertDescription>
-          The Vexa API is not properly configured. Please set the NEXT_PUBLIC_VEXA_API_URL and
-          NEXT_PUBLIC_VEXA_API_KEY environment variables.
+        <AlertDescription className="flex flex-col space-y-2">
+          <p>The Vexa API key is not configured. Please set your API key to use this application.</p>
+          <div className="flex flex-wrap gap-2 mt-1">
+            <Link href="/settings" passHref>
+              <Button variant="outline" size="sm" className="w-fit">
+                <Settings className="h-4 w-4 mr-2" />
+                Go to API Key Settings
+              </Button>
+            </Link>
+            <a 
+              href="https://vexa.ai/dashboard/api-keys" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Button variant="secondary" size="sm" className="w-fit">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Get API Key
+              </Button>
+            </a>
+          </div>
         </AlertDescription>
       </Alert>
     )
@@ -83,7 +106,15 @@ export function ApiStatus() {
         <AlertDescription>
           {MOCK_MODE
             ? "Using mock data for demonstration purposes."
-            : "Vexa API is properly configured with environment variables."}
+            : "Vexa API is properly configured."}
+          {!MOCK_MODE && (
+            <Link href="/settings" className="block mt-2">
+              <Button variant="outline" size="sm" className="w-fit">
+                <Settings className="h-4 w-4 mr-2" />
+                Manage API Key
+              </Button>
+            </Link>
+          )}
         </AlertDescription>
       </Alert>
 

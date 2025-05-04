@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { PlusCircle, RefreshCw, Circle, CheckCircle2, AlertCircle, MoreVertical } from "lucide-react"
+import { PlusCircle, RefreshCw, Circle, CheckCircle2, AlertCircle, MoreVertical, Settings } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Meeting, getMeetingHistory } from "@/lib/transcription-service"
 import { cn } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import Link from "next/link"
 
 interface SidebarProps {
   onNewMeeting: () => void
@@ -101,7 +102,14 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
   return (
     <div className="h-full w-full border-r border-gray-200 bg-gray-50 flex flex-col">
       <div className="p-4">
-        <h2 className="font-semibold text-lg mb-4">Vexa Transcription</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-semibold text-lg">Vexa Transcription</h2>
+          <Link href="/settings">
+            <Button variant="ghost" size="icon" className="h-8 w-8" title="API Settings">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
         
         <div className="flex justify-between items-center mb-4">
           <Button onClick={onNewMeeting} variant="default" className="w-full">

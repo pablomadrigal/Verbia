@@ -61,5 +61,7 @@ USER nextjs
 EXPOSE 3000
 
 ENV PORT 3000
+# Set HOSTNAME so the server binds to all interfaces
+ENV HOSTNAME 0.0.0.0
 
 CMD ["node", "server.js"] 

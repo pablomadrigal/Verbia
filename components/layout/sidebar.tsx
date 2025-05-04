@@ -29,8 +29,12 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
     
     try {
       const fetchedMeetings = await getMeetingHistory()
+      
+      // Filter out meetings with "error" status
+      const filteredMeetings = fetchedMeetings.filter(meeting => meeting.status !== "error")
+      
       // Sort meetings by startTime (most recent first)
-      const sortedMeetings = fetchedMeetings
+      const sortedMeetings = filteredMeetings
         .sort((a, b) => {
           // Fallback to id comparison if startTime is not available
           if (!a.startTime) return 1
@@ -38,7 +42,7 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
           return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
         })
 
-      console.log("Fetched meetings:", sortedMeetings)
+      console.log("Fetched meetings:", fetchedMeetings.length, "Filtered out error meetings:", fetchedMeetings.length - filteredMeetings.length)
       setMeetings(sortedMeetings)
     } catch (err) {
       console.error("Error fetching meetings:", err)

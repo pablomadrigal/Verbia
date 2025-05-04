@@ -97,15 +97,6 @@ export function ApiKeySettings() {
           </div>
         </div>
         
-        {savedKey && (
-          <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
-            <p className="font-semibold">Current API Key Status:</p>
-            <p>API Key: {savedKey ? (showKey ? savedKey : `${savedKey.substring(0, 4)}...${savedKey.substring(savedKey.length - 4)}`) : "None"}</p>
-            <p>Key Length: {savedKey?.length || 0} characters</p>
-            <p>Stored in: Browser Cookie</p>
-          </div>
-        )}
-        
         <Alert className="bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-500" />
           <AlertTitle>Need an API key?</AlertTitle>
@@ -144,10 +135,7 @@ export function ApiKeySettings() {
         
         {savedKey && <ApiKeyTester />}
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={handleClearKey} disabled={!savedKey}>
-          Clear Key
-        </Button>
+      <CardFooter className="flex justify-end">
         <Button onClick={handleSaveKey} disabled={!apiKey || apiKey === savedKey}>
           Save Key
         </Button>

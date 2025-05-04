@@ -9,6 +9,7 @@ import { Meeting, getMeetingHistory } from "@/lib/transcription-service"
 import { cn } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
+import Image from "next/image"
 
 interface SidebarProps {
   onNewMeeting: () => void
@@ -107,12 +108,19 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
     <div className="h-full w-full border-r border-gray-200 bg-gray-50 flex flex-col">
       <div className="p-4">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold text-lg">Vexa Transcription</h2>
-          <Link href="/settings">
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="API Settings">
-              <Settings className="h-4 w-4" />
-            </Button>
+          <Link href="https://vexa.ai" target="_blank" rel="noopener noreferrer">
+            <Image src="/logodark.svg" alt="Vexa Logo" width={30} height={24} />
           </Link>
+          <div className="flex items-center space-x-2">
+            <Link href="https://github.com/Vexa-ai/vexa_example_client" target="_blank" rel="noopener noreferrer" title="Fork me on GitHub">
+              <Image src="/icons8-github.svg" alt="GitHub Logo" width={30} height={30} />
+            </Link>
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="API Settings">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </div>
         
         <div className="flex justify-between items-center mb-4">

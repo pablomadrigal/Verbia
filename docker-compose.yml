@@ -1,0 +1,17 @@
+
+name: vexa-client # Explicitly set the project name
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vexa-client-app # You can change this image name
+    container_name: vexa-client-container # You can change this container name
+    ports:
+      - "3836:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      # Add any other production environment variables here
+      # Example: - DATABASE_URL=your_database_connection_string 

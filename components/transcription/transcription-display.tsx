@@ -537,7 +537,12 @@ export function TranscriptionDisplay({
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm leading-relaxed">{segment.text}</p>
+                    <div className="flex-1">
+                      {segment.speaker && segment.speaker !== "Unknown" && (
+                        <p className="text-xs font-semibold text-gray-600">{segment.speaker}</p>
+                      )}
+                      <p className="text-sm leading-relaxed">{segment.text}</p>
+                    </div>
                     <span className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-0.5 ml-1 flex-shrink-0">
                       <Clock className="h-3 w-3" />
                       {formatTime(segment.timestamp)}

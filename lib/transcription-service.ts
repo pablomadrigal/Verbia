@@ -7,6 +7,7 @@ export interface TranscriptionSegment {
   text: string
   timestamp: string
   speaker?: string
+  language?: string
 }
 
 export interface TranscriptionData {
@@ -240,20 +241,11 @@ export async function startTranscription(
     const { platform, nativeMeetingId } = parseMeetingUrl(meetingUrl)
     
     // Build request payload for /bots endpoint
-    const requestPayload: {
-      platform: string;
-      native_meeting_id: string;
-      language?: string;
-      bot_name: string;
-    } = {
+    const requestPayload = {
       platform,
       native_meeting_id: nativeMeetingId,
-      bot_name: botName
-    }
-    
-    // Only include language if it's not set to auto (to enable auto-detection)
-    if (language !== "auto") {
-      requestPayload.language = language;
+      bot_name: botName,
+      language: language === "auto" ? null : language,
     }
 
     const response = await fetch(`${API_BASE_URL}/bots`, {
@@ -353,7 +345,7 @@ export async function updateTranscriptionLanguage(meetingId: string, language: s
 
     const updateConfigUrl = `${API_BASE_URL}/bots/${platform}/${nativeMeetingId}/config`;
     const updatePayload = {
-      language: language
+      language: language === "auto" ? null : language
     };
 
     const response = await fetch(updateConfigUrl, {
@@ -441,27 +433,36 @@ export async function getTranscription(meetingId: string): Promise<Transcription
     }
 
     // Get segments from the correct location in the response
-    const segments = data.segments || (data.transcript ? data.transcript.segments : []) || [];
-    console.log(`Found ${segments.length} segments in API response`);
+    const segmentsFromApi = data.segments || (data.transcript ? data.transcript.segments : []) || [];
+    console.log(`Found ${segmentsFromApi.length} segments in API response`);
 
     // Transform the Vexa API response into our TranscriptionData format
+    const segments: TranscriptionSegment[] = segmentsFromApi.map((segment: any) => {
+      const segmentText = segment.text || "";
+      const timestamp = segment.absolute_start_time || segment.timestamp || new Date().toISOString();
+      const stableId = `${timestamp}-${segmentText.slice(0, 20).replace(/\s+/g, '-')}`;
+      
+      return {
+        id: stableId,
+        text: segmentText,
+        timestamp: timestamp,
+        speaker: segment.speaker || "Unknown",
+        language: segment.language,
+      };
+    });
+    
+    let overallLanguage = data.language || "auto";
+    if (segments.length > 0) {
+      const lastSegmentWithLanguage = [...segments].reverse().find(s => s.language);
+      if (lastSegmentWithLanguage?.language) {
+        overallLanguage = lastSegmentWithLanguage.language;
+      }
+    }
+
     return {
       meetingId,
-      language: data.language || "en",
-      segments: segments.map((segment: any) => {
-        // Create a deterministic ID based on the text and timestamp
-        // This ensures we can properly detect duplicates
-        const segmentText = segment.text || "";
-        const timestamp = segment.absolute_start_time || segment.timestamp || new Date().toISOString();
-        const stableId = `${timestamp}-${segmentText.slice(0, 20).replace(/\s+/g, '-')}`;
-        
-        return {
-          id: stableId,
-          text: segmentText,
-          timestamp: timestamp,
-          speaker: segment.speaker || "Unknown",
-        };
-      }),
+      language: overallLanguage,
+      segments,
       status: data.status || "active",
       lastUpdated: new Date().toISOString(),
     }
@@ -650,14 +651,11 @@ export async function getMeetingTranscript(meetingId: string): Promise<Transcrip
     }
 
     // Get segments from the correct location in the response
-    const segments = data.segments || (data.transcript ? data.transcript.segments : []) || [];
-    console.log(`Found ${segments.length} segments in API response`);
+    const segmentsFromApi = data.segments || (data.transcript ? data.transcript.segments : []) || [];
+    console.log(`Found ${segmentsFromApi.length} segments in API response`);
 
     // Transform the Vexa API response into our TranscriptionData format
-    return {
-      meetingId,
-      language: data.language || "en",
-      segments: segments.map((segment: any) => {
+    const segments: TranscriptionSegment[] = segmentsFromApi.map((segment: any) => {
         // Create a deterministic ID based on the text and timestamp
         // This ensures we can properly detect duplicates
         const segmentText = segment.text || "";
@@ -669,8 +667,23 @@ export async function getMeetingTranscript(meetingId: string): Promise<Transcrip
           text: segmentText,
           timestamp: timestamp,
           speaker: segment.speaker || "Unknown",
+          language: segment.language,
         };
-      }) || [],
+      });
+      
+    let overallLanguage = data.language || "en";
+    if (segments.length > 0) {
+      const lastSegmentWithLanguage = [...segments].reverse().find(s => s.language);
+      if (lastSegmentWithLanguage?.language) {
+        overallLanguage = lastSegmentWithLanguage.language;
+      }
+    }
+
+    // Transform the Vexa API response into our TranscriptionData format
+    return {
+      meetingId,
+      language: overallLanguage,
+      segments,
       status: "stopped", // Historical view always shows as stopped
       lastUpdated: new Date().toISOString(),
     }

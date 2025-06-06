@@ -217,6 +217,7 @@ export function TranscriptionDisplay({
   const [newSegmentIds, setNewSegmentIds] = useState<Set<string>>(new Set())
   const [selectedLanguage, setSelectedLanguage] = useState<string>("auto")
   const [isChangingLanguage, setIsChangingLanguage] = useState(false)
+  const userHasSelectedLanguage = useRef(false)
   const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const transcriptionRef = useRef<HTMLDivElement>(null)
   const segmentRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -282,8 +283,8 @@ export function TranscriptionDisplay({
         setNewSegmentIds(changedSegmentIds);
       }
 
-      // Update language if it has changed in the transcription data
-      if (data.language && data.language !== selectedLanguage && data.language !== "auto-detected") {
+      // Update language if it has changed in the transcription data, but only if the user hasn't manually selected one
+      if (!userHasSelectedLanguage.current && data.language && data.language !== selectedLanguage && data.language !== "auto-detected") {
         setSelectedLanguage(data.language);
       }
 
@@ -335,8 +336,8 @@ export function TranscriptionDisplay({
       setSegments(data.segments)
       setTranscription(data)
       
-      // Update language from the historical transcript
-      if (data.language && data.language !== "auto-detected") {
+      // Update language from the historical transcript, if user hasn't manually chosen one
+      if (!userHasSelectedLanguage.current && data.language && data.language !== "auto-detected") {
         setSelectedLanguage(data.language);
       }
     } catch (err) {
@@ -360,6 +361,8 @@ export function TranscriptionDisplay({
     setSegments([])
     setTranscription(null)
     setError(null)
+    setSelectedLanguage("auto")
+    userHasSelectedLanguage.current = false
     
     if (shouldDisplay) {
       if (isLive) {
@@ -427,6 +430,10 @@ export function TranscriptionDisplay({
 
   const handleLanguageChange = async (language: string) => {
     if (!meetingId || !isLive) return;
+    
+    // When user makes a selection, we record that.
+    // If they select 'auto', we revert to auto-detection mode.
+    userHasSelectedLanguage.current = language !== "auto"
     
     try {
       setIsChangingLanguage(true);

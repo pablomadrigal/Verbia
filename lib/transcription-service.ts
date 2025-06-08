@@ -14,7 +14,7 @@ export interface TranscriptionData {
   meetingId: string
   language: string
   segments: TranscriptionSegment[]
-  status: "active" | "stopped" | "error"
+  status: "active" | "completed" | "stopped" | "error"
   lastUpdated: string
 }
 
@@ -23,10 +23,19 @@ export interface Meeting {
   platformId: string
   nativeMeetingId: string
   platform: string
-  status: "active" | "stopped" | "error"
+  status: "active" | "completed" | "stopped" | "error"
   startTime: string
   endTime?: string
   title?: string
+  name?: string
+  participants?: string[]
+  languages?: string[]
+  data?: {
+    name?: string
+    participants?: string[]
+    languages?: string[]
+    notes?: string
+  }
 }
 
 // Mock data for meeting history
@@ -36,20 +45,34 @@ const mockMeetings: Meeting[] = [
     platformId: "google_meet",
     nativeMeetingId: "abc-defg-hij",
     platform: "google_meet",
-    status: "stopped",
+    status: "completed",
     startTime: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
     endTime: new Date(Date.now() - 83000000).toISOString(),
-    title: "Product Team Standup"
+    title: "Product Team Standup",
+    name: "Product Team Standup",
+    participants: ["Alice", "Bob"],
+    data: {
+      name: "Product Team Standup",
+      participants: ["Alice", "Bob"],
+      languages: ["en"]
+    }
   },
   {
     id: "mock-meeting-2",
     platformId: "google_meet",
     nativeMeetingId: "xyz-uvwt-rst",
     platform: "google_meet",
-    status: "stopped",
+    status: "completed",
     startTime: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
     endTime: new Date(Date.now() - 169200000).toISOString(),
-    title: "Design Review"
+    title: "Design Review",
+    name: "Design Review",
+    participants: ["Charlie", "Diana"],
+    data: {
+      name: "Design Review", 
+      participants: ["Charlie", "Diana"],
+      languages: ["en"]
+    }
   },
   {
     id: "mock-meeting-3",
@@ -58,7 +81,9 @@ const mockMeetings: Meeting[] = [
     platform: "google_meet",
     status: "active",
     startTime: new Date().toISOString(),
-    title: "Client Presentation"
+    title: "Client Presentation",
+    name: "Client Presentation",
+    participants: ["Eve", "Frank"]
   }
 ];
 
@@ -552,10 +577,14 @@ export async function getMeetingHistory(): Promise<Meeting[]> {
       platformId: meeting.platform,
       nativeMeetingId: meeting.native_meeting_id,
       platform: meeting.platform,
-      status: meeting.status || "stopped",
+      status: meeting.status || "completed",
       startTime: meeting.start_time || new Date().toISOString(),
       endTime: meeting.end_time,
-      title: `Meeting ${meeting.native_meeting_id}`
+      title: meeting.data?.name || `Meeting ${meeting.native_meeting_id}`,
+      name: meeting.data?.name,
+      participants: meeting.data?.participants,
+      languages: meeting.data?.languages,
+      data: meeting.data
     }));
   } catch (error) {
     console.error("Error getting meeting history:", error)
@@ -689,6 +718,113 @@ export async function getMeetingTranscript(meetingId: string): Promise<Transcrip
     }
   } catch (error) {
     console.error("Error getting meeting transcript:", error)
+    throw error
+  }
+}
+
+/**
+ * Update meeting metadata (name, participants, languages, notes)
+ * @param meetingId The ID of the meeting to update (platform/nativeMeetingId/id format)
+ * @param data The data to update (name, participants, languages, notes)
+ */
+export async function updateMeetingData(
+  meetingId: string, 
+  data: {
+    name?: string
+    participants?: string[]
+    languages?: string[]
+    notes?: string
+  }
+): Promise<{ success: boolean }> {
+  // Use mock implementation if in mock mode
+  if (MOCK_MODE) {
+    await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate API delay
+    
+    // Find the mock meeting and update it
+    const meetingIndex = mockMeetings.findIndex(m => m.id === meetingId);
+    if (meetingIndex !== -1) {
+      mockMeetings[meetingIndex] = {
+        ...mockMeetings[meetingIndex],
+        title: data.name || mockMeetings[meetingIndex].title,
+        name: data.name,
+        participants: data.participants,
+        languages: data.languages,
+        data: {
+          ...mockMeetings[meetingIndex].data,
+          ...data
+        }
+      };
+    }
+    
+    return { success: true }
+  }
+
+  // Real API implementation using Vexa API
+  try {
+    // Parse meetingId to get platform and nativeMeetingId
+    const parts = meetingId.split('/');
+    if (parts.length < 2) {
+      throw new Error("Invalid meeting ID format")
+    }
+    
+    const platform = parts[0];
+    const nativeMeetingId = parts[1];
+
+    const response = await fetch(`${API_BASE_URL}/meetings/${platform}/${nativeMeetingId}`, {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ data })
+    })
+
+    await handleApiResponse<any>(response)
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating meeting data:", error)
+    throw error
+  }
+}
+
+/**
+ * Delete a meeting and all its associated transcripts
+ * @param meetingId The ID of the meeting to delete (platform/nativeMeetingId/id format)
+ */
+export async function deleteMeeting(meetingId: string): Promise<{ success: boolean }> {
+  // Use mock implementation if in mock mode
+  if (MOCK_MODE) {
+    await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate API delay
+    
+    // Remove the mock meeting
+    const meetingIndex = mockMeetings.findIndex(m => m.id === meetingId);
+    if (meetingIndex !== -1) {
+      mockMeetings.splice(meetingIndex, 1);
+    }
+    
+    // Remove associated transcript data
+    delete mockTranscriptionData[meetingId];
+    
+    return { success: true }
+  }
+
+  // Real API implementation using Vexa API
+  try {
+    // Parse meetingId to get platform and nativeMeetingId
+    const parts = meetingId.split('/');
+    if (parts.length < 2) {
+      throw new Error("Invalid meeting ID format")
+    }
+    
+    const platform = parts[0];
+    const nativeMeetingId = parts[1];
+
+    const response = await fetch(`${API_BASE_URL}/meetings/${platform}/${nativeMeetingId}`, {
+      method: "DELETE",
+      headers: getHeaders()
+    })
+
+    await handleApiResponse<any>(response)
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting meeting:", error)
     throw error
   }
 }

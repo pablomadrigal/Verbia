@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { PlusCircle, RefreshCw, Circle, CheckCircle2, AlertCircle, MoreVertical, Settings } from "lucide-react"
+import { PlusCircle, RefreshCw, Circle, CheckCircle2, AlertCircle, MoreVertical, Settings, Edit2, Trash2, Users, Check, X } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Meeting, getMeetingHistory } from "@/lib/transcription-service"
+import { Meeting, getMeetingHistory, updateMeetingData, deleteMeeting } from "@/lib/transcription-service"
 import { cn } from "@/lib/utils"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -23,6 +25,17 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [meetingToDelete, setMeetingToDelete] = useState<Meeting | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Memoize the change handler to prevent unnecessary re-renders
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditingName(e.target.value)
+  }, [])
 
   const loadMeetings = async () => {
     setIsLoading(true)
@@ -44,6 +57,14 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
         })
 
       console.log("Fetched meetings:", fetchedMeetings.length, "Filtered out error meetings:", fetchedMeetings.length - filteredMeetings.length)
+      
+      // If we're currently editing a meeting, preserve the editing state
+      // unless the meeting no longer exists
+      if (editingMeetingId && !sortedMeetings.find(m => m.id === editingMeetingId)) {
+        setEditingMeetingId(null)
+        setEditingName("")
+      }
+      
       setMeetings(sortedMeetings)
     } catch (err) {
       console.error("Error fetching meetings:", err)
@@ -101,6 +122,68 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
     } catch (e) {
       console.error("Error formatting date:", e)
       return dateString
+    }
+  }
+
+  const handleEditStart = (meeting: Meeting, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingMeetingId(meeting.id)
+  }
+
+  const handleEditCancel = useCallback(() => {
+    setEditingMeetingId(null)
+  }, [])
+
+  const handleEditSave = useCallback(async (newName: string) => {
+    if (!editingMeetingId) return;
+
+    setIsUpdating(true)
+    try {
+      await updateMeetingData(editingMeetingId, { name: newName.trim() })
+      
+      setMeetings(prev => prev.map(meeting => 
+        meeting.id === editingMeetingId 
+          ? { 
+              ...meeting, 
+              name: newName.trim(),
+              title: newName.trim(),
+              data: { ...meeting.data, name: newName.trim() }
+            }
+          : meeting
+      ))
+      
+      setEditingMeetingId(null)
+    } catch (err) {
+      console.error("Error updating meeting:", err)
+      setError("Failed to update meeting name")
+    } finally {
+      setIsUpdating(false)
+    }
+  }, [editingMeetingId])
+
+  const handleDeleteStart = (meeting: Meeting, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setMeetingToDelete(meeting)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!meetingToDelete) return
+    
+    setIsDeleting(true)
+    try {
+      await deleteMeeting(meetingToDelete.id)
+      
+      // Update the local state
+      setMeetings(prev => prev.filter(meeting => meeting.id !== meetingToDelete.id))
+      
+      setDeleteDialogOpen(false)
+      setMeetingToDelete(null)
+    } catch (err) {
+      console.error("Error deleting meeting:", err)
+      setError("Failed to delete meeting")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -168,47 +251,187 @@ export function Sidebar({ onNewMeeting, onSelectMeeting, selectedMeetingId }: Si
             {meetings.map((meeting) => (
               <div 
                 key={meeting.id} 
-                onClick={() => onSelectMeeting(meeting)}
+                onClick={() => editingMeetingId !== meeting.id && onSelectMeeting(meeting)}
                 className={cn(
-                  "flex items-center justify-between p-2 rounded-md cursor-pointer",
-                  "hover:bg-gray-200 transition-colors",
+                  "flex items-center justify-between p-2 rounded-md transition-colors",
+                  editingMeetingId !== meeting.id && "cursor-pointer hover:bg-gray-200",
                   selectedMeetingId === meeting.id && "bg-gray-200"
                 )}
               >
-                <div className="flex items-center space-x-2 overflow-hidden">
+                <div className="flex items-center space-x-2 overflow-hidden flex-1 min-w-0">
                   {getStatusIcon(meeting.status)}
-                  <div className="truncate">
-                    <div className="text-sm font-medium truncate">
-                      {meeting.title || `Meeting ${meeting.nativeMeetingId || ""}`}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {formatDate(meeting.startTime)}
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    {editingMeetingId === meeting.id ? (
+                      <EditingInput
+                        initialName={meeting.name || meeting.title || `Meeting ${meeting.nativeMeetingId}`}
+                        onSave={handleEditSave}
+                        onCancel={handleEditCancel}
+                        isUpdating={isUpdating}
+                      />
+                    ) : (
+                      <>
+                        <div className="text-sm font-medium truncate">
+                          {meeting.name || meeting.title || `Meeting ${meeting.nativeMeetingId || ""}`}
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-gray-500">
+                          <span>{formatDate(meeting.startTime)}</span>
+                          {meeting.participants && meeting.participants.length > 0 && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center space-x-1">
+                                <Users className="h-3 w-3" />
+                                <span>{meeting.participants.length}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {meeting.participants && meeting.participants.length > 0 && (
+                          <div className="text-xs text-gray-400 truncate">
+                            {meeting.participants.join(", ")}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
                 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4" />
-                      <span className="sr-only">Open menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation();
-                      // Copy meeting ID to clipboard
-                      navigator.clipboard.writeText(meeting.id);
-                    }}>
-                      Copy ID
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {editingMeetingId !== meeting.id && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">Open menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={(e) => handleEditStart(meeting, e)}>
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Edit Name
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={(e) => handleDeleteStart(meeting, e)}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Meeting</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{meetingToDelete?.name || meetingToDelete?.title || 'this meeting'}"? 
+              This action cannot be undone and will permanently delete the meeting and all its transcripts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 
+
+interface EditingInputProps {
+  initialName: string;
+  onSave: (newName: string) => void;
+  onCancel: () => void;
+  isUpdating: boolean;
+}
+
+const EditingInput = ({ initialName, onSave, onCancel, isUpdating }: EditingInputProps) => {
+  const [name, setName] = useState(initialName);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; // Reset height
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Set to scroll height
+    }
+  }, [name]); // Re-run when name changes
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Save on Enter (but not Shift+Enter for new lines)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (name.trim() && name.trim() !== initialName) {
+        onSave(name);
+      } else {
+        onCancel();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+    }
+  };
+
+  const handleBlur = () => {
+    if (name.trim() && name.trim() !== initialName) {
+      onSave(name);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleBlur();
+  }
+
+  return (
+    <div className="flex items-start space-x-1 flex-1" onBlur={handleBlur}>
+      <textarea
+        ref={textareaRef}
+        rows={1}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="text-sm border border-input bg-background rounded-md px-2 py-1 leading-tight resize-none overflow-hidden"
+        style={{
+          width: `${Math.max(120, Math.min(180, name.length * 8 + 16))}px`,
+          maxWidth: '180px',
+        }}
+        autoFocus
+        disabled={isUpdating}
+      />
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-6 w-6"
+        onMouseDown={handleSaveClick}
+        disabled={isUpdating || !name.trim()}
+      >
+        <Check className="h-3 w-3" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-6 w-6"
+        onMouseDown={(e) => { e.stopPropagation(); onCancel(); }}
+        disabled={isUpdating}
+      >
+        <X className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}; 

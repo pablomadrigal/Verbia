@@ -43,7 +43,7 @@ const languageOptions = [
   { value: "hi", label: "Hindi" },
   { value: "it", label: "Italian" },
   { value: "ko", label: "Korean" },
-  
+
   // All other supported languages alphabetically
   { value: "af", label: "Afrikaans" },
   { value: "am", label: "Armenian" },
@@ -93,17 +93,17 @@ const languageOptions = [
 ];
 
 // Searchable Language Selector Component
-function LanguageSelector({ 
-  value, 
-  onValueChange, 
-  disabled 
-}: { 
-  value: string; 
-  onValueChange: (value: string) => void; 
-  disabled?: boolean 
+function LanguageSelector({
+  value,
+  onValueChange,
+  disabled
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  
+
   // Find the selected language label
   const selectedLanguage = languageOptions.find(lang => lang.value === value)
 
@@ -155,20 +155,20 @@ function LanguageSelector({
 function TranscriptionCountdown() {
   const [countdown, setCountdown] = useState(10);
   const [countdownComplete, setCountdownComplete] = useState(false);
-  
+
   useEffect(() => {
     if (countdown <= 0) {
       setCountdownComplete(true);
       return;
     }
-    
+
     const timer = setTimeout(() => {
       setCountdown(prev => prev - 1);
     }, 1000);
-    
+
     return () => clearTimeout(timer);
   }, [countdown]);
-  
+
   return (
     <div className="text-center py-4 flex flex-col items-center space-y-2">
       {!countdownComplete ? (
@@ -200,28 +200,32 @@ interface TranscriptionDisplayProps {
   onStop?: () => void
   isLive?: boolean
   title?: string
+  transcription: TranscriptionData | null
+  segments: TranscriptionSegment[]
+  isLoading: boolean
+  error: string | null
+  onLanguageChange?: (language: string) => Promise<void>
+  selectedLanguage?: string
+  isChangingLanguage?: boolean
 }
 
-export function TranscriptionDisplay({ 
-  meetingId, 
-  onStop, 
+export function TranscriptionDisplay({
+  meetingId,
+  onStop,
   isLive = true,
-  title
+  title,
+  transcription,
+  segments,
+  isLoading,
+  error,
+  onLanguageChange,
+  selectedLanguage = "auto",
+  isChangingLanguage = false
 }: TranscriptionDisplayProps) {
-  const [transcription, setTranscription] = useState<TranscriptionData | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isPolling, setIsPolling] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [segments, setSegments] = useState<TranscriptionSegment[]>([])
   const [highlightedSegmentId, setHighlightedSegmentId] = useState<string | null>(null)
   const [newSegmentIds, setNewSegmentIds] = useState<Set<string>>(new Set())
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("auto")
-  const [isChangingLanguage, setIsChangingLanguage] = useState(false)
-  const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const transcriptionRef = useRef<HTMLDivElement>(null)
   const segmentRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const retryCount = useRef(0)
-  const MAX_RETRIES = 3
 
   const shouldDisplay = !!meetingId
 
@@ -234,154 +238,6 @@ export function TranscriptionDisplay({
       return () => clearTimeout(timer);
     }
   }, [newSegmentIds]);
-
-  // Function to poll for transcription updates in live mode
-  const pollForUpdates = async () => {
-    if (!meetingId) return
-
-    setIsPolling(true)
-    try {
-      console.log("Polling for updates with meetingId:", meetingId);
-      const data = await getTranscription(meetingId)
-      console.log("Polling update received:", data.segments.length, "segments");
-
-      // Reset retry count on successful request
-      retryCount.current = 0
-
-      // Track new or changed segments for highlight effect
-      const changedSegmentIds = new Set<string>();
-
-      // Always use the most recent segments from the API
-      // but maintain the highlight effect for new/changed content
-      setSegments((prevSegments) => {
-        // Get the previous segments as a map for easy comparison
-        const prevSegmentsMap = new Map(prevSegments.map(s => [s.id, s]));
-        
-        // Mark segments that are new or changed compared to previous state
-        data.segments.forEach(segment => {
-          const prevSegment = prevSegmentsMap.get(segment.id);
-          if (!prevSegment || prevSegment.text !== segment.text) {
-            changedSegmentIds.add(segment.id);
-          }
-        });
-        
-        // Log changes if any
-        if (changedSegmentIds.size > 0) {
-          console.log(`Found ${changedSegmentIds.size} new or updated segments`);
-        }
-        
-        // Always return the complete set of segments from the API
-        // This ensures we're always in sync with the backend
-        return [...data.segments].sort((a, b) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-      });
-
-      // Update the highlight state
-      if (changedSegmentIds.size > 0) {
-        setNewSegmentIds(changedSegmentIds);
-      }
-
-      // Update language if it has changed in the transcription data
-      if (data.language && data.language !== selectedLanguage && data.language !== "auto-detected") {
-        setSelectedLanguage(data.language);
-      }
-
-      setTranscription(data)
-
-      // If the status is no longer active, stop polling
-      if (data.status !== "active") {
-        if (pollingInterval.current) {
-          clearInterval(pollingInterval.current)
-          pollingInterval.current = null
-          console.log("Stopping polling because status is:", data.status);
-        }
-
-        if (data.status === "error") {
-          setError("Transcription service reported an error. Please try again.")
-        }
-      }
-    } catch (err) {
-      console.error("Error polling for transcription:", err)
-
-      // Implement retry logic
-      retryCount.current += 1
-      if (retryCount.current >= MAX_RETRIES) {
-        setError("Failed to update transcription after multiple attempts")
-
-        // Stop polling after max retries
-        if (pollingInterval.current) {
-          clearInterval(pollingInterval.current)
-          pollingInterval.current = null
-          console.log("Stopping polling after max retries");
-        }
-      } else {
-        setError(`Failed to update transcription. Retrying... (${retryCount.current}/${MAX_RETRIES})`)
-      }
-    } finally {
-      setIsPolling(false)
-    }
-  }
-
-  // Function to fetch historical transcripts (non-polling)
-  const fetchHistoricalTranscript = async () => {
-    if (!meetingId) return
-    
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      const data = await getMeetingTranscript(meetingId)
-      setSegments(data.segments)
-      setTranscription(data)
-      
-      // Update language from the historical transcript
-      if (data.language && data.language !== "auto-detected") {
-        setSelectedLanguage(data.language);
-      }
-    } catch (err) {
-      console.error("Error fetching historical transcript:", err)
-      setError("Failed to load transcript")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Start polling when component mounts in live mode
-  useEffect(() => {
-    // Clean up any existing polling interval
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current)
-      pollingInterval.current = null
-      console.log("Cleared existing polling interval");
-    }
-    
-    // Reset state when meeting ID changes
-    setSegments([])
-    setTranscription(null)
-    setError(null)
-    
-    if (shouldDisplay) {
-      if (isLive) {
-        // Live mode: start polling
-        console.log("Starting polling for meetingId:", meetingId);
-        pollForUpdates()
-        pollingInterval.current = setInterval(pollForUpdates, 800) // Poll more frequently
-      } else {
-        // Historical mode: just fetch once
-        console.log("Fetching historical transcript for meetingId:", meetingId);
-        fetchHistoricalTranscript()
-      }
-    }
-
-    // Clean up interval when component unmounts
-    return () => {
-      if (pollingInterval.current) {
-        clearInterval(pollingInterval.current)
-        console.log("Cleaned up polling interval on unmount");
-      }
-    }
-  }, [shouldDisplay, meetingId, isLive])
 
   // Scroll to bottom when new segments are added
   useEffect(() => {
@@ -403,47 +259,14 @@ export function TranscriptionDisplay({
   const handleStop = async () => {
     if (!meetingId || !onStop) return
     try {
-      setIsLoading(true)
-
-      // Clear polling interval
-      if (pollingInterval.current) {
-        clearInterval(pollingInterval.current)
-        pollingInterval.current = null
-      }
-
-      await stopTranscription(meetingId)
-      onStop()
+      await onStop()
     } catch (err) {
       console.error("Error stopping transcription:", err)
-      setError("Failed to stop transcription")
-    } finally {
-      setIsLoading(false)
     }
   }
 
   const handleHighlightSegment = (segmentId: string) => {
     setHighlightedSegmentId(segmentId)
-  }
-
-  const handleLanguageChange = async (language: string) => {
-    if (!meetingId || !isLive) return;
-    
-    try {
-      setIsChangingLanguage(true);
-      setError(null);
-      
-      await updateTranscriptionLanguage(meetingId, language);
-      setSelectedLanguage(language);
-      
-      // Clear existing segments to start fresh with the new language
-      setSegments([]);
-      
-    } catch (err) {
-      console.error("Error updating language:", err);
-      setError("Failed to update language. Please try again.");
-    } finally {
-      setIsChangingLanguage(false);
-    }
   }
 
   if (!shouldDisplay) {
@@ -460,7 +283,7 @@ export function TranscriptionDisplay({
     <Card className="w-full border border-gray-200 shadow-sm flex flex-col h-full">
       <CardHeader className="flex flex-row items-center justify-between py-1 px-3 border-b">
         <div className="flex items-center gap-2">
-          {isLive && isPolling && <Loader2 className="h-3 w-3 animate-spin text-gray-500" />}
+          {isLive && isLoading && <Loader2 className="h-3 w-3 animate-spin text-gray-500" />}
           {!isLive && (
             <>
               <History className="h-3 w-3 text-gray-500" />
@@ -469,11 +292,11 @@ export function TranscriptionDisplay({
           )}
         </div>
         <div className="flex items-center gap-1">
-          {isLive && (
+          {isLive && onLanguageChange && (
             <div className="flex items-center mr-1">
               <LanguageSelector
                 value={selectedLanguage}
-                onValueChange={handleLanguageChange}
+                onValueChange={onLanguageChange}
                 disabled={isChangingLanguage || isLoading}
               />
             </div>
@@ -498,7 +321,7 @@ export function TranscriptionDisplay({
             <TranscriptSearch segments={segments} onHighlight={handleHighlightSegment} />
           </div>
         )}
-        
+
         {error && (
           <Alert variant="destructive" className="mx-3 mt-1 py-1">
             <AlertCircle className="h-3 w-3" />
@@ -513,13 +336,13 @@ export function TranscriptionDisplay({
           </div>
         )}
 
-        <div 
-          ref={transcriptionRef} 
+        <div
+          ref={transcriptionRef}
           className="flex-1 overflow-y-auto border-t border-gray-200 bg-gray-50 p-2 mt-1"
         >
           {segments.length === 0 && !isLoading ? (
             <div className="text-center text-gray-500 py-4">
-              {isLive 
+              {isLive
                 ? <TranscriptionCountdown />
                 : "No transcript available for this meeting."
               }

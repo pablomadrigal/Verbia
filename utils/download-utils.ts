@@ -14,7 +14,7 @@ export function formatTranscriptForDownload(
       const speaker = includeSpeakers && segment.speaker ? `${segment.speaker}: ` : ""
       return `${timestamp}${speaker}${segment.text}`
     })
-    .join("\n\n")
+    .join("\n")
 }
 
 /**

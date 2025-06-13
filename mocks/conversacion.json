@@ -1,0 +1,129 @@
+[
+    {
+      "id": "1",
+      "timestamp": "00:00:03",
+      "speaker": "Designer",
+      "text": "Hello everyone, thanks for joining the call today! Let's start with you, Client A. Could you please describe your project goals?"
+    },
+    {
+      "id": "2",
+      "timestamp": "00:00:12",
+      "speaker": "Client A",
+      "text": "Hi! Thanks for having us. We're launching a new e-commerce platform focused on sustainable fashion."
+    },
+    {
+      "id": "3",
+      "timestamp": "00:00:18",
+      "speaker": "Designer",
+      "text": "Sounds exciting! What key features are you envisioning for the platform?"
+    },
+    {
+      "id": "4",
+      "timestamp": "00:00:22",
+      "speaker": "Client A",
+      "text": "We need a catalog with filtering options, user reviews, and a loyalty rewards system."
+    },
+    {
+      "id": "5",
+      "timestamp": "00:00:28",
+      "speaker": "Designer",
+      "text": "Great, noted. Client B, how about your project?"
+    },
+    {
+      "id": "6",
+      "timestamp": "00:00:31",
+      "speaker": "Client B",
+      "text": "Hello! We are developing a mobile app to help people track their fitness goals with social sharing features."
+    },
+    {
+      "id": "7",
+      "timestamp": "00:00:37",
+      "speaker": "Designer",
+      "text": "Nice, what functionalities should the app include?"
+    },
+    {
+      "id": "8",
+      "timestamp": "00:00:40",
+      "speaker": "Client B",
+      "text": "Besides tracking workouts and nutrition, we want a community forum and personalized coaching tips."
+    },
+    {
+      "id": "9",
+      "timestamp": "00:00:46",
+      "speaker": "Designer",
+      "text": "Excellent. Regarding design style, any preferences?"
+    },
+    {
+      "id": "10",
+      "timestamp": "00:00:49",
+      "speaker": "Client A",
+      "text": "For us, something modern and minimalist, with natural colors like greens and browns to reflect sustainability."
+    },
+    {
+      "id": "11",
+      "timestamp": "00:00:55",
+      "speaker": "Client B",
+      "text": "We prefer a vibrant and energetic look with bold colors like reds and oranges to motivate users."
+    },
+    {
+      "id": "12",
+      "timestamp": "00:01:02",
+      "speaker": "Designer",
+      "text": "Understood. What about brand identity and the feeling you want users to get?"
+    },
+    {
+      "id": "13",
+      "timestamp": "00:01:06",
+      "speaker": "Client A",
+      "text": "Trustworthy, eco-conscious, and professional."
+    },
+    {
+      "id": "14",
+      "timestamp": "00:01:09",
+      "speaker": "Client B",
+      "text": "Fun, dynamic, and inspiring."
+    },
+    {
+      "id": "15",
+      "timestamp": "00:01:12",
+      "speaker": "Designer",
+      "text": "Perfect. Any existing assets or brand guidelines?"
+    },
+    {
+      "id": "16",
+      "timestamp": "00:01:15",
+      "speaker": "Client A",
+      "text": "Yes, I'll share our logo and style guide after the call."
+    },
+    {
+      "id": "17",
+      "timestamp": "00:01:18",
+      "speaker": "Client B",
+      "text": "Same here, we'll send over our branding files."
+    },
+    {
+      "id": "18",
+      "timestamp": "00:01:21",
+      "speaker": "Designer",
+      "text": "Great, and what's your timeline for launch?"
+    },
+    {
+      "id": "19",
+      "timestamp": "00:01:24",
+      "speaker": "Client A",
+      "text": "About four months from now."
+    },
+    {
+      "id": "20",
+      "timestamp": "00:01:26",
+      "speaker": "Client B",
+      "text": "We're aiming for six months."
+    },
+    {
+      "id": "21",
+      "timestamp": "00:01:29",
+      "speaker": "Designer",
+      "text": "Thanks for all the details! I'll prepare initial wireframes and concepts and get back to you soon."
+    }
+]
+  

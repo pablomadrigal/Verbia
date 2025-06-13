@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
-import { StartForm } from "@/components/transcription/start-form"
-import { TranscriptionDisplay } from "@/components/transcription/transcription-display"
 import { Meeting } from "@/lib/transcription-service"
 import { ChevronRight, ChevronLeft, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { SetupMode } from "@/components/modes/setup-mode"
+import { LiveMode } from "@/components/modes/live-mode"
+import { HistoryMode } from "@/components/modes/history-mode"
 
 interface AppLayoutProps {
   user: {
@@ -50,7 +51,7 @@ export function AppLayout({ user }: AppLayoutProps) {
     setSelectedHistoricalMeeting(null)
     setMode("setup")
   }
-  
+
   // On small screens, automatically collapse sidebar for better UX
   useEffect(() => {
     const handleResize = () => {
@@ -58,10 +59,10 @@ export function AppLayout({ user }: AppLayoutProps) {
         setSidebarOpen(false)
       }
     }
-    
+
     // Initial check
     handleResize()
-    
+
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
@@ -69,17 +70,17 @@ export function AppLayout({ user }: AppLayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-white relative">
       {/* Mobile sidebar toggle button */}
-      <Button 
-        variant="ghost" 
+      <Button
+        variant="ghost"
         size="icon"
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="absolute top-2 left-2 z-50 md:hidden"
       >
         <Menu className="h-5 w-5" />
       </Button>
-      
+
       {/* Sidebar with responsive behavior */}
-      <div 
+      <div
         className={`
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0 md:opacity-100 md:w-1'}
@@ -87,17 +88,17 @@ export function AppLayout({ user }: AppLayoutProps) {
         `}
       >
         {sidebarOpen && (
-          <Sidebar 
+          <Sidebar
             onNewMeeting={handleNewMeeting}
             onSelectMeeting={handleSelectHistoricalMeeting}
-            selectedMeetingId={mode === "history" ? selectedHistoricalMeeting?.id || null : 
-                              mode === "live" ? activeMeetingId : null}
+            selectedMeetingId={mode === "history" ? selectedHistoricalMeeting?.id || null :
+              mode === "live" ? activeMeetingId : null}
           />
         )}
-        
+
         {/* Desktop sidebar toggle */}
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className={`
@@ -109,51 +110,27 @@ export function AppLayout({ user }: AppLayoutProps) {
           {sidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
-      
+
       {/* Main content area that expands when sidebar is collapsed */}
       <div className={`
         flex-1 overflow-hidden flex flex-col p-2 transition-all
         ${!sidebarOpen ? 'md:pl-4' : ''}
       `}>
-        <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col h-full">
-          {!sidebarOpen && (
-            <div className="mb-1 flex justify-end">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-                className="hidden md:flex h-6 text-xs py-0 px-2"
-              >
-                <ChevronRight className="h-3 w-3 mr-1" /> Show Sidebar
-              </Button>
-            </div>
-          )}
+        <div className="w-full mx-auto flex-1 flex flex-col h-full">
 
           {mode === "setup" && (
-            <StartForm 
-              onStart={handleStartMeeting} 
-              isCollapsed={false} 
-            />
+            <SetupMode onStart={handleStartMeeting} />
           )}
 
           {mode === "live" && activeMeetingId && (
-            <div className="flex-1 flex flex-col h-full">
-              <TranscriptionDisplay 
-                meetingId={activeMeetingId} 
-                onStop={handleStopMeeting}
-                isLive={true}
-              />
-            </div>
+            <LiveMode
+              meetingId={activeMeetingId}
+              onStop={handleStopMeeting}
+            />
           )}
 
           {mode === "history" && selectedHistoricalMeeting && (
-            <div className="flex-1 flex flex-col h-full">
-              <TranscriptionDisplay 
-                meetingId={selectedHistoricalMeeting.id}
-                isLive={false}
-                title={selectedHistoricalMeeting.title || `Meeting ${selectedHistoricalMeeting.nativeMeetingId}`}
-              />
-            </div>
+            <HistoryMode meeting={selectedHistoricalMeeting} />
           )}
         </div>
       </div>

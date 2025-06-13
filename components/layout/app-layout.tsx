@@ -116,19 +116,7 @@ export function AppLayout({ user }: AppLayoutProps) {
         flex-1 overflow-hidden flex flex-col p-2 transition-all
         ${!sidebarOpen ? 'md:pl-4' : ''}
       `}>
-        <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col h-full">
-          {!sidebarOpen && (
-            <div className="mb-1 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-                className="hidden md:flex h-6 text-xs py-0 px-2"
-              >
-                <ChevronRight className="h-3 w-3 mr-1" /> Show Sidebar
-              </Button>
-            </div>
-          )}
+        <div className="w-full mx-auto flex-1 flex flex-col h-full">
 
           {mode === "setup" && (
             <SetupMode onStart={handleStartMeeting} />

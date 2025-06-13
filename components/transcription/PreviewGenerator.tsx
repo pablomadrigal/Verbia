@@ -7,37 +7,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatTranscriptForDownload } from "@/utils/download-utils";
 import { TranscriptionSegment } from "@/lib/transcription-service";
 import ReactMarkdown from 'react-markdown';
-
-interface Screen {
-    name: string;
-    html: string;
-    css: string;
-}
-
-interface PreviewResponse {
-    ui: string;
-    executiveSummary: string;
-    error?: string;
-}
-
-interface UiData {
-    "title": string,
-    "description": string,
-    "colorPalette": string,
-    "brandIdentity": string,
-    "targetAudience": string,
-    "summary": string,
-    "generalCss": string,
-    "screens": Screen[]
-}
+import { StructureResponse } from "@/app/api/generate-structure/route";
+import { HtmlResponse, HtmlScreen } from "@/app/api/generate-html/route";
+import DesignPreviewCard from "./DesignPreviewCard";
 
 export default function PreviewGenerator({ segments }: { segments: TranscriptionSegment[] }) {
-    const [preview, setPreview] = useState<React.ReactNode | null>(null);
     const [loading, setLoading] = useState(false);
+    const [loadingPreview, setLoadingPreview] = useState(false);
     const [transcription, setTranscription] = useState<string | null>(null);
     const [executiveSummary, setExecutiveSummary] = useState<string>("");
-    const [screens, setScreens] = useState<Screen[]>([]);
+    const [screens, setScreens] = useState<HtmlScreen[]>([]);
+    const [structure, setStructure] = useState<StructureResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [useMock, setUseMock] = useState(false);
 
     useEffect(() => {
         if (segments) {
@@ -46,52 +28,65 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
         }
     }, [segments]);
 
-    const generatePreview = async () => {
+    useEffect(() => {
+        const generateHtml = async () => {
+            if (structure) {
+                setLoadingPreview(true);
+                try {
+                    const response = await fetch("/api/generate-html", {
+                        method: useMock ? "GET" : "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: useMock ? undefined : JSON.stringify(structure),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        const html = data.replace(/```json\n|\n```|`/g, ''); // Remove all backticks and code block markers
+                        const htmlData: HtmlResponse = JSON.parse(html);
+                        console.log(htmlData);
+                        setScreens(htmlData.screens || []);
+                        setLoadingPreview(false);
+                    }
+                    else {
+                        setError("Error creating the HTML pages. Please try again.");
+                        setLoadingPreview(false);
+                    }
+                } catch (err) {
+                    console.error("Error generating preview", err);
+                    setError("Error creating the HTML pages. Please try again.");
+                    setLoadingPreview(false);
+                }
+            }
+        };
+        generateHtml();
+    }, [structure]);
+
+    const generatePreview = async (useMockAI: boolean) => {
         setLoading(true);
-        setPreview(null);
         setError(null);
+        setUseMock(useMockAI);
+        const mock = await fetch("/mocks/conversation.txt");
+        const text = await mock.text();
+        setTranscription(text)
         try {
-            const response = await fetch("/api/generate-preview", {
-                method: "POST",
+            const response = await fetch("/api/generate-structure", {
+                method: useMockAI ? "GET" : "POST",
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ transcription: transcription, cliente: "Adrian" }),
+                body: useMockAI ? undefined : JSON.stringify({ transcript: text }),
             });
-            const data: PreviewResponse = await response.json();
-
+            const data = await response.json();
             if (response.ok) {
-                try {
-                    const ui = data.ui.replace(/```json\n|\n```|`/g, ''); // Remove all backticks and code block markers
-                    const uiData: UiData = JSON.parse(ui);
-                    setExecutiveSummary(data.executiveSummary || '');
-                    setScreens(uiData.screens || []);
-                    localStorage.setItem('previewScreens', JSON.stringify(uiData.screens));
-                    setPreview(
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <h2 className="text-sm font-medium">Screens</h2>
-                                {uiData.screens.map((screen: Screen, index: number) => (
-                                    <div key={index} className="border border-gray-200 rounded p-2 hover:bg-gray-50">
-                                        <h3 className="text-xs font-medium mb-1">{screen.name}</h3>
-                                        <a
-                                            href={`/preview/${index}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-blue-600 hover:underline"
-                                        >
-                                            View Preview
-                                        </a>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                } catch (err) {
-                    console.error("Error parsing UI data:", err);
-                    setError("Error parsing UI data. Please try again.");
-                }
-            } else {
+                const gptResponse = data.replace(/```json\n|\n```|`/g, ''); // Remove all backticks and code block markers
+                const structureData: StructureResponse = JSON.parse(gptResponse);
+                console.log(structureData);
+                setExecutiveSummary(structureData.summary || '');
+                setStructure(structureData);
+            }
+            else {
+                console.error("Error generating preview", data);
                 setError(data.error || "Failed to generate preview");
             }
         } catch (err) {
@@ -110,12 +105,20 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
                     <span className="text-xs font-medium">Preview Generator</span>
                 </div>
                 <Button
-                    onClick={generatePreview}
+                    onClick={() => generatePreview(false)}
                     size="sm"
                     className="h-7 text-xs py-0 px-2"
                     disabled={loading || !transcription}
                 >
-                    Generate Preview
+                    Generate preview with AI
+                </Button>
+                <Button
+                    onClick={() => generatePreview(true)}
+                    size="sm"
+                    className="h-7 text-xs py-0 px-2"
+                    disabled={loading || !transcription}
+                >
+                    Generate with Mock
                 </Button>
             </CardHeader>
             <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
@@ -134,17 +137,49 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
                             <Skeleton className="h-32 w-full" />
                         </div>
                     ) : (
-                        <>
-                            {executiveSummary && (
-                                <div className="prose max-w-none mb-4 bg-white p-4 rounded-lg shadow-sm">
-                                    <h2 className="text-base font-semibold mb-3 text-gray-900">Executive Summary</h2>
-                                    <div className="text-sm text-gray-700">
-                                        <ReactMarkdown>{executiveSummary}</ReactMarkdown>
+                        <div className="flex flex-col h-full">
+                            <div className="h-1/2 overflow-y-auto">
+                                {executiveSummary && (
+                                    <div className="prose max-w-none mb-4 bg-white p-4 rounded-lg shadow-sm">
+                                        <h2 className="text-base font-semibold mb-3 text-gray-900">Executive Summary</h2>
+                                        <div className="text-sm text-gray-700">
+                                            <ReactMarkdown components={{
+                                                h2: ({ node, ...props }) => <h2 className="text-lg font-semibold mb-2" {...props} />,
+                                                h3: ({ node, ...props }) => <h3 className="text-base font-semibold mb-2" {...props} />,
+                                                p: ({ node, ...props }) => <p className="mb-2" {...props} />,
+                                                ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                                                ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                                                li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                                strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                                            }}>
+                                                {executiveSummary}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                            {preview}
-                        </>
+                                )}
+                            </div>
+                            <div className="h-1/2 overflow-y-auto border-t border-gray-200 pt-2">
+                                {loadingPreview ? (
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-32 w-full" />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col h-full">
+                                        <h2 className="text-sm font-medium">Screens</h2>
+                                        <div className="flex-1 overflow-auto">
+                                            <div className="flex flex-row gap-4 -mt-2 pt-2">
+                                                {screens.map((screen, index) => (
+                                                    <div key={index} className="flex-shrink-0 border border-gray-200 rounded-lg p-4 bg-white">
+                                                        <DesignPreviewCard {...screen} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             </CardContent>

@@ -152,7 +152,7 @@ export function LiveMode({ meetingId, onStop }: LiveModeProps) {
                 />
             </div>
             <div className="w-1/2">
-                <PreviewGenerator segments={segments} />
+                <PreviewGenerator segments={segments} meetingId={meetingId} />
             </div>
         </div>
     )

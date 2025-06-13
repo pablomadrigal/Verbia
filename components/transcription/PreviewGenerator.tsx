@@ -11,7 +11,7 @@ import { StructureResponse } from "@/app/api/generate-structure/route";
 import { HtmlResponse, HtmlScreen } from "@/app/api/generate-html/route";
 import DesignPreviewCard from "./DesignPreviewCard";
 
-export default function PreviewGenerator({ segments }: { segments: TranscriptionSegment[] }) {
+export default function PreviewGenerator({ segments, meetingId }: { segments: TranscriptionSegment[], meetingId: string }) {
     const [loading, setLoading] = useState(false);
     const [loadingPreview, setLoadingPreview] = useState(false);
     const [transcription, setTranscription] = useState<string | null>(null);
@@ -22,15 +22,20 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
     const [useMock, setUseMock] = useState(false);
 
     useEffect(() => {
-        if (segments) {
-            const text = formatTranscriptForDownload(segments, true, true)
-            setTranscription(text)
+        if (meetingId) {
             setStructure(null)
             setScreens([])
             setLoadingPreview(false)
             setError(null)
             setUseMock(false)
             setExecutiveSummary("")
+        }
+    }, [meetingId]);
+
+    useEffect(() => {
+        if (segments) {
+            const text = formatTranscriptForDownload(segments, true, true)
+            setTranscription(text)
         }
     }, [segments]);
 
@@ -72,16 +77,20 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
         setLoading(true);
         setError(null);
         setUseMock(useMockAI);
-        const mock = await fetch("/mocks/conversation.txt");
-        const text = await mock.text();
-        setTranscription(text)
+        let text = null;
+        console.log("useMockAI", useMockAI);
+        if (useMockAI) {
+            const mock = await fetch("/mocks/conversation.txt");
+            text = await mock.text();
+        }
         try {
+            const transcript = text || transcription;
             const response = await fetch("/api/generate-structure", {
                 method: useMockAI ? "GET" : "POST",
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: useMockAI ? undefined : JSON.stringify({ transcript: text }),
+                body: useMockAI ? undefined : JSON.stringify({ transcript }),
             });
             const data = await response.json();
             if (response.ok) {

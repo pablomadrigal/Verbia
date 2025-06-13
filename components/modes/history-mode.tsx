@@ -49,7 +49,7 @@ export function HistoryMode({ meeting }: HistoryModeProps) {
                 />
             </div>
             <div className="w-1/2">
-                <PreviewGenerator segments={segments} />
+                <PreviewGenerator segments={segments} meetingId={meeting.id} />
             </div>
         </div>
     )

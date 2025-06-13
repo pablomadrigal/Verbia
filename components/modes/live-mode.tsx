@@ -1,6 +1,7 @@
 import { TranscriptionDisplay } from "@/components/transcription/transcription-display"
 import { getTranscription, stopTranscription, updateTranscriptionLanguage, type TranscriptionData, type TranscriptionSegment } from "@/lib/transcription-service"
 import { useEffect, useRef, useState } from "react"
+import PreviewGenerator from "../transcription/PreviewGenerator"
 
 interface LiveModeProps {
     meetingId: string
@@ -135,19 +136,24 @@ export function LiveMode({ meetingId, onStop }: LiveModeProps) {
     }, [meetingId])
 
     return (
-        <div className="flex-1 flex flex-col h-full">
-            <TranscriptionDisplay
-                meetingId={meetingId}
-                onStop={handleStop}
-                isLive={true}
-                transcription={transcription}
-                segments={segments}
-                isLoading={isLoading}
-                error={error}
-                onLanguageChange={handleLanguageChange}
-                selectedLanguage={selectedLanguage}
-                isChangingLanguage={isChangingLanguage}
-            />
+        <div className="flex-1 flex h-full gap-4">
+            <div className="w-1/2">
+                <TranscriptionDisplay
+                    meetingId={meetingId}
+                    onStop={handleStop}
+                    isLive={true}
+                    transcription={transcription}
+                    segments={segments}
+                    isLoading={isLoading}
+                    error={error}
+                    onLanguageChange={handleLanguageChange}
+                    selectedLanguage={selectedLanguage}
+                    isChangingLanguage={isChangingLanguage}
+                />
+            </div>
+            <div className="w-1/2">
+                <PreviewGenerator segments={segments} />
+            </div>
         </div>
     )
 } 

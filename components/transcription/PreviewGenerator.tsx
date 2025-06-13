@@ -25,6 +25,12 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
         if (segments) {
             const text = formatTranscriptForDownload(segments, true, true)
             setTranscription(text)
+            setStructure(null)
+            setScreens([])
+            setLoadingPreview(false)
+            setError(null)
+            setUseMock(false)
+            setExecutiveSummary("")
         }
     }, [segments]);
 

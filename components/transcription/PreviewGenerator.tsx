@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTranscriptForDownload } from "@/utils/download-utils";
 import { TranscriptionSegment } from "@/lib/transcription-service";
+import ReactMarkdown from 'react-markdown';
 
 interface Screen {
     name: string;
@@ -12,8 +17,18 @@ interface Screen {
 interface PreviewResponse {
     ui: string;
     executiveSummary: string;
-    screens: Screen[];
     error?: string;
+}
+
+interface UiData {
+    "title": string,
+    "description": string,
+    "colorPalette": string,
+    "brandIdentity": string,
+    "targetAudience": string,
+    "summary": string,
+    "generalCss": string,
+    "screens": Screen[]
 }
 
 export default function PreviewGenerator({ segments }: { segments: TranscriptionSegment[] }) {
@@ -22,6 +37,7 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
     const [transcription, setTranscription] = useState<string | null>(null);
     const [executiveSummary, setExecutiveSummary] = useState<string>("");
     const [screens, setScreens] = useState<Screen[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (segments) {
@@ -30,83 +46,108 @@ export default function PreviewGenerator({ segments }: { segments: Transcription
         }
     }, [segments]);
 
-    const generarPreview = async () => {
+    const generatePreview = async () => {
         setLoading(true);
         setPreview(null);
+        setError(null);
         try {
-            /* const response = await fetch("/api/generate-preview", {
+            const response = await fetch("/api/generate-preview", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ transcription, cliente: "Adrian" }),
-            }); */
-            const response = await fetch("/api/generate-preview");
-
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ transcription: transcription, cliente: "Adrian" }),
+            });
             const data: PreviewResponse = await response.json();
-            console.log(data);
-            console.log(response);
 
             if (response.ok) {
-                console.log("Response ok");
-                setExecutiveSummary(data.executiveSummary);
-                setScreens(data.screens);
-                localStorage.setItem('previewScreens', JSON.stringify(data.screens));
-                setPreview(
-                    <div className="space-y-6">
-                        <div className="prose max-w-none">
-                            <h2 className="text-xl font-bold mb-4">Executive Summary</h2>
-                            <div dangerouslySetInnerHTML={{ __html: data.executiveSummary }} />
-                        </div>
+                try {
+                    const ui = data.ui.replace(/```json\n|\n```|`/g, ''); // Remove all backticks and code block markers
+                    const uiData: UiData = JSON.parse(ui);
+                    setExecutiveSummary(data.executiveSummary || '');
+                    setScreens(uiData.screens || []);
+                    localStorage.setItem('previewScreens', JSON.stringify(uiData.screens));
+                    setPreview(
                         <div className="space-y-4">
-                            <h2 className="text-xl font-bold">Screens</h2>
-                            {data.screens.map((screen, index) => (
-                                <div key={index} className="border p-4 rounded">
-                                    <h3 className="font-semibold mb-2">{screen.name}</h3>
-                                    <a
-                                        href={`/preview/${index}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:underline"
-                                    >
-                                        View Preview
-                                    </a>
-                                </div>
-                            ))}
+                            <div className="space-y-2">
+                                <h2 className="text-sm font-medium">Screens</h2>
+                                {uiData.screens.map((screen: Screen, index: number) => (
+                                    <div key={index} className="border border-gray-200 rounded p-2 hover:bg-gray-50">
+                                        <h3 className="text-xs font-medium mb-1">{screen.name}</h3>
+                                        <a
+                                            href={`/preview/${index}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-blue-600 hover:underline"
+                                        >
+                                            View Preview
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                );
+                    );
+                } catch (err) {
+                    console.error("Error parsing UI data:", err);
+                    setError("Error parsing UI data. Please try again.");
+                }
             } else {
-                console.error(data.error);
-                setPreview(<p className="text-red-600">Error: {data.error}</p>);
+                setError(data.error || "Failed to generate preview");
             }
         } catch (err) {
-            console.error(err);
-            setPreview(<p className="text-red-600">Error al generar preview</p>);
+            setError("Error generating preview");
+            console.error("Error generating preview", err);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="p-4 max-w-2xl mx-auto">
-            <button
-                onClick={generarPreview}
-                className="mt-4 px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
-                disabled={loading || !transcription}
-            >
-                Generar Preview
-            </button>
+        <Card className="w-full border border-gray-200 shadow-sm flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between py-1 px-3 border-b">
+                <div className="flex items-center gap-2">
+                    {loading && <Loader2 className="h-3 w-3 animate-spin text-gray-500" />}
+                    <span className="text-xs font-medium">Preview Generator</span>
+                </div>
+                <Button
+                    onClick={generatePreview}
+                    size="sm"
+                    className="h-7 text-xs py-0 px-2"
+                    disabled={loading || !transcription}
+                >
+                    Generate Preview
+                </Button>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+                {error && (
+                    <Alert variant="destructive" className="mx-3 mt-1 py-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <AlertTitle className="text-xs">Error</AlertTitle>
+                        <AlertDescription className="text-xs">{error}</AlertDescription>
+                    </Alert>
+                )}
 
-            <div className="mt-6">
-                {loading && (
-                    <div className="space-y-4">
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-64 w-full" />
-                    </div>
-                )}
-                {!loading && executiveSummary && (
-                    <div className="border mt-4 p-4 rounded shadow">{executiveSummary}</div>
-                )}
-            </div>
-        </div>
+                <div className="flex-1 overflow-y-auto border-t border-gray-200 bg-gray-50 p-2 mt-1">
+                    {loading ? (
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-32 w-full" />
+                        </div>
+                    ) : (
+                        <>
+                            {executiveSummary && (
+                                <div className="prose max-w-none mb-4 bg-white p-4 rounded-lg shadow-sm">
+                                    <h2 className="text-base font-semibold mb-3 text-gray-900">Executive Summary</h2>
+                                    <div className="text-sm text-gray-700">
+                                        <ReactMarkdown>{executiveSummary}</ReactMarkdown>
+                                    </div>
+                                </div>
+                            )}
+                            {preview}
+                        </>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
     );
 }

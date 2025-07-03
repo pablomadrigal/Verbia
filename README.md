@@ -94,4 +94,6 @@ This project is licensed under the Apache License 2.0 - see the LICENSE file for
 ## Acknowledgments
 
 - Built on the [Vexa API](https://github.com/Vexa-ai/vexa)
-- Uses [shadcn/ui](https://ui.shadcn.com/) for UI components 
+- Uses [shadcn/ui](https://ui.shadcn.com/) for UI components
+
+- ![image](https://github.com/user-attachments/assets/b5abec02-9db6-42a1-8690-3271dfc4d0b6)
